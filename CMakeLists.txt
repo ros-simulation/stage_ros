@@ -5,17 +5,20 @@ find_package(catkin REQUIRED COMPONENTS geometry_msgs nav_msgs roscpp rostest se
 
 find_package(Boost REQUIRED COMPONENTS system thread)
 
+find_package(FLTK REQUIRED)
+
 set(Stage_DIR cmake)
 find_package(Stage REQUIRED)
 
-include_directories(include
+include_directories(
   ${catkin_INCLUDE_DIRS}
   ${Boost_INCLUDE_DIRS}
+  ${FLTK_INCLUDE_DIRS}
   ${Stage_INCLUDE_DIRS}
 )
 
 catkin_package(
-  INCLUDE_DIRS include ${Stage_INCLUDE_DIRS}
+  INCLUDE_DIRS ${Stage_INCLUDE_DIRS}
   LIBRARIES stage_ros ${Stage_LIBRARIES}
   CATKIN_DEPENDS geometry_msgs nav_msgs roscpp sensor_msgs std_msgs tf
   DEPENDS Boost
@@ -23,7 +26,7 @@ catkin_package(
 
 # Declare a cpp executable
 add_executable(stageros src/stageros.cpp)
-target_link_libraries(stageros ${catkin_LIBRARIES} ${Boost_LIBRARIES} ${Stage_LIBRARIES})
+target_link_libraries(stageros ${catkin_LIBRARIES} ${Boost_LIBRARIES} ${FLTK_LIBRARIES} ${Stage_LIBRARIES})
 if(catkin_EXPORTED_TARGETS)
 	add_dependencies(stageros ${catkin_EXPORTED_TARGETS})
 endif()
