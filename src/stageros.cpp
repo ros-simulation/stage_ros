@@ -42,6 +42,7 @@
 #include <boost/thread/mutex.hpp>
 #include <boost/thread/thread.hpp>
 #include <sensor_msgs/LaserScan.h>
+#include <sensor_msgs/Image.h>
 #include <nav_msgs/Odometry.h>
 #include <geometry_msgs/Twist.h>
 #include <rosgraph_msgs/Clock.h>
@@ -49,6 +50,7 @@
 #include "tf/transform_broadcaster.h"
 
 #define USAGE "stageros <worldfile>"
+#define IMAGE "image"
 #define ODOM "odom"
 #define BASE_SCAN "base_scan"
 #define BASE_POSE_GROUND_TRUTH "base_pose_ground_truth"
@@ -59,6 +61,7 @@ class StageNode
 {
   private:
     // Messages that we'll send or receive
+    sensor_msgs::Image *imageMsgs;
     sensor_msgs::LaserScan *laserMsgs;
     nav_msgs::Odometry *odomMsgs;
     nav_msgs::Odometry *groundTruthMsgs;
@@ -71,8 +74,10 @@ class StageNode
     boost::mutex msg_lock;
 
     // The models that we're interested in
+    std::vector<Stg::ModelCamera *> cameramodels;
     std::vector<Stg::ModelRanger *> lasermodels;
     std::vector<Stg::ModelPosition *> positionmodels;
+    std::vector<ros::Publisher> image_pubs_;
     std::vector<ros::Publisher> laser_pubs_;
     std::vector<ros::Publisher> odom_pubs_;
     std::vector<ros::Publisher> ground_truth_pubs_;
@@ -150,6 +155,8 @@ StageNode::ghfunc(Stg::Model* mod, StageNode* node)
     node->lasermodels.push_back(dynamic_cast<Stg::ModelRanger *>(mod));
   if (dynamic_cast<Stg::ModelPosition *>(mod))
     node->positionmodels.push_back(dynamic_cast<Stg::ModelPosition *>(mod));
+  if (dynamic_cast<Stg::ModelCamera *>(mod))
+    node->cameramodels.push_back(dynamic_cast<Stg::ModelCamera *>(mod));
 }
 
 void
@@ -201,19 +208,26 @@ StageNode::StageNode(int argc, char** argv, bool gui, const char* fname)
   this->world->AddUpdateCallback((Stg::world_callback_t)s_update, this);
 
   this->world->ForEachDescendant((Stg::model_callback_t)ghfunc, this);
-  if (lasermodels.size() != positionmodels.size())
+  if (lasermodels.size() > 0 && lasermodels.size() != positionmodels.size())
   {
     ROS_FATAL("number of position models and laser models must be equal in "
               "the world file.");
     ROS_BREAK();
   }
+  else if (cameramodels.size() > 0 && cameramodels.size() != positionmodels.size())
+  {
+    ROS_FATAL("number of position models and camera models must be equal in "
+              "the world file.");
+    ROS_BREAK();
+  }
   size_t numRobots = positionmodels.size();
-  ROS_INFO("found %u position/laser pair%s in the file", 
-           (unsigned int)numRobots, (numRobots==1) ? "" : "s");
+  ROS_INFO("found %u position and laser(%u)/camera(%u) pair%s in the file", 
+           (unsigned int)numRobots, (unsigned int) lasermodels.size(), (unsigned int) cameramodels.size(), (numRobots==1) ? "" : "s");
 
   this->laserMsgs = new sensor_msgs::LaserScan[numRobots];
   this->odomMsgs = new nav_msgs::Odometry[numRobots];
   this->groundTruthMsgs = new nav_msgs::Odometry[numRobots];
+  this->imageMsgs = new sensor_msgs::Image[numRobots];
 }
 
 
@@ -230,11 +244,11 @@ StageNode::SubscribeModels()
 
   for (size_t r = 0; r < this->positionmodels.size(); r++)
   {
-    if(this->lasermodels[r])
+    if(this->lasermodels.size()>r && this->lasermodels[r])
     {
       this->lasermodels[r]->Subscribe();
     }
-    else
+    else if (this->lasermodels.size()>0)
     {
       ROS_ERROR("no laser");
       return(-1);
@@ -248,9 +262,19 @@ StageNode::SubscribeModels()
       ROS_ERROR("no position");
       return(-1);
     }
+    if(this->cameramodels.size()>r && this->cameramodels[r])
+    {
+      this->cameramodels[r]->Subscribe();
+    }
+    else if (this->cameramodels.size()>0)
+    {
+      ROS_ERROR("no camera %d", this->cameramodels.size());
+      return(-1);
+    }
     laser_pubs_.push_back(n_.advertise<sensor_msgs::LaserScan>(mapName(BASE_SCAN,r), 10));
     odom_pubs_.push_back(n_.advertise<nav_msgs::Odometry>(mapName(ODOM,r), 10));
     ground_truth_pubs_.push_back(n_.advertise<nav_msgs::Odometry>(mapName(BASE_POSE_GROUND_TRUTH,r), 10));
+    image_pubs_.push_back(n_.advertise<sensor_msgs::Image>(mapName(IMAGE,r), 10));
     cmdvel_subs_.push_back(n_.subscribe<geometry_msgs::Twist>(mapName(CMD_VEL,r), 10, boost::bind(&StageNode::cmdvelReceived, this, r, _1)));
   }
   clock_pub_ = n_.advertise<rosgraph_msgs::Clock>("/clock",10);
@@ -262,6 +286,7 @@ StageNode::~StageNode()
   delete[] laserMsgs;
   delete[] odomMsgs;
   delete[] groundTruthMsgs;
+  delete[] imageMsgs;
 }
 
 bool
@@ -336,7 +361,10 @@ StageNode::WorldCallback()
     tf.sendTransform(tf::StampedTransform(txLaser, sim_time,
                                           mapName("base_link", r),
                                           mapName("base_laser_link", r)));
-
+    }
+    
+    for (size_t r = 0; r < this->positionmodels.size(); r++)
+		{
     // Send the identity transform between base_footprint and base_link
     tf::Transform txIdentity(tf::createIdentityQuaternion(),
                              tf::Point(0, 0, 0));
@@ -402,6 +430,40 @@ StageNode::WorldCallback()
     this->groundTruthMsgs[r].header.stamp = sim_time;
 
     this->ground_truth_pubs_[r].publish(this->groundTruthMsgs[r]);
+  }
+  
+  for (size_t r = 0; r < this->cameramodels.size(); r++)
+  {
+    // Get latest image data
+    // Translate into ROS message format and publish
+    if (this->cameramodels[r]->FrameColor()) {
+       this->imageMsgs[r].height=this->cameramodels[r]->getHeight();
+       this->imageMsgs[r].width=this->cameramodels[r]->getWidth();
+       this->imageMsgs[r].encoding="rgba8";
+       //this->imageMsgs[r].is_bigendian="";
+       this->imageMsgs[r].step=this->imageMsgs[r].width*4;
+       this->imageMsgs[r].data.resize(this->imageMsgs[r].width*this->imageMsgs[r].height*4);
+
+       memcpy(&(this->imageMsgs[r].data[0]),this->cameramodels[r]->FrameColor(),this->imageMsgs[r].width*this->imageMsgs[r].height*4);
+
+       //invert the opengl weirdness
+       int height = this->imageMsgs[r].height - 1;
+       int linewidth = this->imageMsgs[r].width*4;
+
+       char* temp = new char[linewidth];
+       for (int y = 0; y < (height+1)/2; y++) 
+       {
+            memcpy(temp,&this->imageMsgs[r].data[y*linewidth],linewidth);
+            memcpy(&(this->imageMsgs[r].data[y*linewidth]),&(this->imageMsgs[r].data[(height-y)*linewidth]),linewidth);
+            memcpy(&(this->imageMsgs[r].data[(height-y)*linewidth]),temp,linewidth);
+       }
+
+        this->imageMsgs[r].header.frame_id = mapName("image", r);
+        this->imageMsgs[r].header.stamp = sim_time;
+
+        this->image_pubs_[r].publish(this->imageMsgs[r]);
+    }
+
   }
 
   this->clockMsg.clock = sim_time;
