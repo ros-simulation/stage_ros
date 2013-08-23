@@ -190,7 +190,7 @@ StageNode::StageNode(int argc, char** argv, bool gui, const char* fname)
   this->base_watchdog_timeout.fromSec(t);
   
   if(!localn.getParam("is_depth_canonical", isDepthCanonical))
-    isDepthCanonical = 0.2;
+    isDepthCanonical = true;
   
 
   // We'll check the existence of the world file, because libstage doesn't
@@ -492,16 +492,15 @@ StageNode::WorldCallback()
     if (this->depth_pubs_[r].getNumSubscribers()>0 && this->cameramodels[r]->FrameDepth()) {
       this->depthMsgs[r].height=this->cameramodels[r]->getHeight();
       this->depthMsgs[r].width=this->cameramodels[r]->getWidth();
-      bool isCanonical = true;
-      this->depthMsgs[r].encoding=isCanonical?sensor_msgs::image_encodings::TYPE_32FC1:sensor_msgs::image_encodings::TYPE_16UC1;
+      this->depthMsgs[r].encoding=this->isDepthCanonical?sensor_msgs::image_encodings::TYPE_32FC1:sensor_msgs::image_encodings::TYPE_16UC1;
       //this->depthMsgs[r].is_bigendian="";
-      int sz = isCanonical?sizeof(float):sizeof(uint16_t);
+      int sz = this->isDepthCanonical?sizeof(float):sizeof(uint16_t);
       size_t len = this->depthMsgs[r].width*this->depthMsgs[r].height;
       this->depthMsgs[r].step=this->depthMsgs[r].width*sz;
       this->depthMsgs[r].data.resize(len*sz);
 
-      //processing data according to REP117
-      if (isCanonical){
+      //processing data according to REP118
+      if (this->isDepthCanonical){
         double nearClip = this->cameramodels[r]->getCamera().nearClip();
         double farClip = this->cameramodels[r]->getCamera().farClip();
         memcpy(&(this->depthMsgs[r].data[0]),this->cameramodels[r]->FrameDepth(),len*sz);
