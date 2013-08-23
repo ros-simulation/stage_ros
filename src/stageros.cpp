@@ -42,6 +42,9 @@
 #include <boost/thread/mutex.hpp>
 #include <boost/thread/thread.hpp>
 #include <sensor_msgs/LaserScan.h>
+#include <sensor_msgs/Image.h>
+#include <sensor_msgs/image_encodings.h>
+#include <sensor_msgs/CameraInfo.h>
 #include <nav_msgs/Odometry.h>
 #include <geometry_msgs/Twist.h>
 #include <rosgraph_msgs/Clock.h>
@@ -49,6 +52,9 @@
 #include "tf/transform_broadcaster.h"
 
 #define USAGE "stageros <worldfile>"
+#define IMAGE "image"
+#define DEPTH "depth"
+#define CAMERA_INFO "camera_info"
 #define ODOM "odom"
 #define BASE_SCAN "base_scan"
 #define BASE_POSE_GROUND_TRUTH "base_pose_ground_truth"
@@ -59,6 +65,9 @@ class StageNode
 {
   private:
     // Messages that we'll send or receive
+    sensor_msgs::CameraInfo *cameraMsgs;
+    sensor_msgs::Image *imageMsgs;
+    sensor_msgs::Image *depthMsgs;
     sensor_msgs::LaserScan *laserMsgs;
     nav_msgs::Odometry *odomMsgs;
     nav_msgs::Odometry *groundTruthMsgs;
@@ -71,13 +80,19 @@ class StageNode
     boost::mutex msg_lock;
 
     // The models that we're interested in
+    std::vector<Stg::ModelCamera *> cameramodels;
     std::vector<Stg::ModelRanger *> lasermodels;
     std::vector<Stg::ModelPosition *> positionmodels;
+    std::vector<ros::Publisher> image_pubs_;
+    std::vector<ros::Publisher> depth_pubs_;
+    std::vector<ros::Publisher> camera_pubs_;
     std::vector<ros::Publisher> laser_pubs_;
     std::vector<ros::Publisher> odom_pubs_;
     std::vector<ros::Publisher> ground_truth_pubs_;
     std::vector<ros::Subscriber> cmdvel_subs_;
     ros::Publisher clock_pub_;
+    
+    bool isDepthCanonical;
 
     // A helper function that is executed for each stage model.  We use it
     // to search for models of interest.
@@ -150,6 +165,8 @@ StageNode::ghfunc(Stg::Model* mod, StageNode* node)
     node->lasermodels.push_back(dynamic_cast<Stg::ModelRanger *>(mod));
   if (dynamic_cast<Stg::ModelPosition *>(mod))
     node->positionmodels.push_back(dynamic_cast<Stg::ModelPosition *>(mod));
+  if (dynamic_cast<Stg::ModelCamera *>(mod))
+    node->cameramodels.push_back(dynamic_cast<Stg::ModelCamera *>(mod));
 }
 
 void
@@ -171,6 +188,10 @@ StageNode::StageNode(int argc, char** argv, bool gui, const char* fname)
   if(!localn.getParam("base_watchdog_timeout", t))
     t = 0.2;
   this->base_watchdog_timeout.fromSec(t);
+  
+  if(!localn.getParam("is_depth_canonical", isDepthCanonical))
+    isDepthCanonical = true;
+  
 
   // We'll check the existence of the world file, because libstage doesn't
   // expose its failure to open it.  Could go further with checks (e.g., is
@@ -201,19 +222,28 @@ StageNode::StageNode(int argc, char** argv, bool gui, const char* fname)
   this->world->AddUpdateCallback((Stg::world_callback_t)s_update, this);
 
   this->world->ForEachDescendant((Stg::model_callback_t)ghfunc, this);
-  if (lasermodels.size() != positionmodels.size())
+  if (lasermodels.size() > 0 && lasermodels.size() != positionmodels.size())
   {
     ROS_FATAL("number of position models and laser models must be equal in "
               "the world file.");
     ROS_BREAK();
   }
+  else if (cameramodels.size() > 0 && cameramodels.size() != positionmodels.size())
+  {
+    ROS_FATAL("number of position models and camera models must be equal in "
+              "the world file.");
+    ROS_BREAK();
+  }
   size_t numRobots = positionmodels.size();
-  ROS_INFO("found %u position/laser pair%s in the file", 
-           (unsigned int)numRobots, (numRobots==1) ? "" : "s");
+  ROS_INFO("found %u position and laser(%u)/camera(%u) pair%s in the file", 
+           (unsigned int)numRobots, (unsigned int) lasermodels.size(), (unsigned int) cameramodels.size(), (numRobots==1) ? "" : "s");
 
   this->laserMsgs = new sensor_msgs::LaserScan[numRobots];
   this->odomMsgs = new nav_msgs::Odometry[numRobots];
   this->groundTruthMsgs = new nav_msgs::Odometry[numRobots];
+  this->imageMsgs = new sensor_msgs::Image[numRobots];
+  this->depthMsgs = new sensor_msgs::Image[numRobots];
+  this->cameraMsgs = new sensor_msgs::CameraInfo[numRobots];
 }
 
 
@@ -230,11 +260,11 @@ StageNode::SubscribeModels()
 
   for (size_t r = 0; r < this->positionmodels.size(); r++)
   {
-    if(this->lasermodels[r])
+    if(this->lasermodels.size()>r && this->lasermodels[r])
     {
       this->lasermodels[r]->Subscribe();
     }
-    else
+    else if (this->lasermodels.size()>0)
     {
       ROS_ERROR("no laser");
       return(-1);
@@ -248,9 +278,24 @@ StageNode::SubscribeModels()
       ROS_ERROR("no position");
       return(-1);
     }
-    laser_pubs_.push_back(n_.advertise<sensor_msgs::LaserScan>(mapName(BASE_SCAN,r), 10));
+    if(this->cameramodels.size()>r && this->cameramodels[r])
+    {
+      this->cameramodels[r]->Subscribe();
+    }
+    else if (this->cameramodels.size()>0)
+    {
+      ROS_ERROR("no camera %d", this->cameramodels.size());
+      return(-1);
+    }
+    if (this->lasermodels.size()>r)
+      laser_pubs_.push_back(n_.advertise<sensor_msgs::LaserScan>(mapName(BASE_SCAN,r), 10));
     odom_pubs_.push_back(n_.advertise<nav_msgs::Odometry>(mapName(ODOM,r), 10));
     ground_truth_pubs_.push_back(n_.advertise<nav_msgs::Odometry>(mapName(BASE_POSE_GROUND_TRUTH,r), 10));
+    if (this->cameramodels.size()>r){
+      image_pubs_.push_back(n_.advertise<sensor_msgs::Image>(mapName(IMAGE,r), 10));
+      depth_pubs_.push_back(n_.advertise<sensor_msgs::Image>(mapName(DEPTH,r), 10));
+      camera_pubs_.push_back(n_.advertise<sensor_msgs::CameraInfo>(mapName(CAMERA_INFO,r), 10));
+    }
     cmdvel_subs_.push_back(n_.subscribe<geometry_msgs::Twist>(mapName(CMD_VEL,r), 10, boost::bind(&StageNode::cmdvelReceived, this, r, _1)));
   }
   clock_pub_ = n_.advertise<rosgraph_msgs::Clock>("/clock",10);
@@ -262,6 +307,9 @@ StageNode::~StageNode()
   delete[] laserMsgs;
   delete[] odomMsgs;
   delete[] groundTruthMsgs;
+  delete[] imageMsgs;
+  delete[] depthMsgs;
+  delete[] cameraMsgs;
 }
 
 bool
@@ -332,11 +380,14 @@ StageNode::WorldCallback()
     tf::Quaternion laserQ;
     laserQ.setRPY(0.0, 0.0, lp.a);
     tf::Transform txLaser =  tf::Transform(laserQ,
-                                            tf::Point(lp.x, lp.y, 0.15));
+                                            tf::Point(lp.x, lp.y, this->positionmodels[r]->GetGeom().size.z+lp.z));
     tf.sendTransform(tf::StampedTransform(txLaser, sim_time,
                                           mapName("base_link", r),
                                           mapName("base_laser_link", r)));
-
+    }
+    
+    for (size_t r = 0; r < this->positionmodels.size(); r++)
+		{
     // Send the identity transform between base_footprint and base_link
     tf::Transform txIdentity(tf::createIdentityQuaternion(),
                              tf::Point(0, 0, 0));
@@ -402,6 +453,149 @@ StageNode::WorldCallback()
     this->groundTruthMsgs[r].header.stamp = sim_time;
 
     this->ground_truth_pubs_[r].publish(this->groundTruthMsgs[r]);
+  }
+  
+  for (size_t r = 0; r < this->cameramodels.size(); r++)
+  {
+    // Get latest image data
+    // Translate into ROS message format and publish
+    if (this->image_pubs_[r].getNumSubscribers()>0 && this->cameramodels[r]->FrameColor()) {
+       this->imageMsgs[r].height=this->cameramodels[r]->getHeight();
+       this->imageMsgs[r].width=this->cameramodels[r]->getWidth();
+       this->imageMsgs[r].encoding="rgba8";
+       //this->imageMsgs[r].is_bigendian="";
+       this->imageMsgs[r].step=this->imageMsgs[r].width*4;
+       this->imageMsgs[r].data.resize(this->imageMsgs[r].width*this->imageMsgs[r].height*4);
+
+       memcpy(&(this->imageMsgs[r].data[0]),this->cameramodels[r]->FrameColor(),this->imageMsgs[r].width*this->imageMsgs[r].height*4);
+
+       //invert the opengl weirdness
+       int height = this->imageMsgs[r].height - 1;
+       int linewidth = this->imageMsgs[r].width*4;
+
+       char* temp = new char[linewidth];
+       for (int y = 0; y < (height+1)/2; y++) 
+       {
+            memcpy(temp,&this->imageMsgs[r].data[y*linewidth],linewidth);
+            memcpy(&(this->imageMsgs[r].data[y*linewidth]),&(this->imageMsgs[r].data[(height-y)*linewidth]),linewidth);
+            memcpy(&(this->imageMsgs[r].data[(height-y)*linewidth]),temp,linewidth);
+       }
+
+        this->imageMsgs[r].header.frame_id = mapName("camera", r);
+        this->imageMsgs[r].header.stamp = sim_time;
+
+        this->image_pubs_[r].publish(this->imageMsgs[r]);      
+    }
+    //Get latest depth data
+    //Translate into ROS message format and publish
+    //Skip if there are no subscribers
+    if (this->depth_pubs_[r].getNumSubscribers()>0 && this->cameramodels[r]->FrameDepth()) {
+      this->depthMsgs[r].height=this->cameramodels[r]->getHeight();
+      this->depthMsgs[r].width=this->cameramodels[r]->getWidth();
+      this->depthMsgs[r].encoding=this->isDepthCanonical?sensor_msgs::image_encodings::TYPE_32FC1:sensor_msgs::image_encodings::TYPE_16UC1;
+      //this->depthMsgs[r].is_bigendian="";
+      int sz = this->isDepthCanonical?sizeof(float):sizeof(uint16_t);
+      size_t len = this->depthMsgs[r].width*this->depthMsgs[r].height;
+      this->depthMsgs[r].step=this->depthMsgs[r].width*sz;
+      this->depthMsgs[r].data.resize(len*sz);
+
+      //processing data according to REP118
+      if (this->isDepthCanonical){
+        double nearClip = this->cameramodels[r]->getCamera().nearClip();
+        double farClip = this->cameramodels[r]->getCamera().farClip();
+        memcpy(&(this->depthMsgs[r].data[0]),this->cameramodels[r]->FrameDepth(),len*sz);
+        float * data = (float*)&(this->depthMsgs[r].data[0]);
+        for (size_t i=0;i<len;++i)
+          if(data[i]<=nearClip) 
+            data[i] = -INFINITY;
+          else if(data[i]>=farClip) 
+            data[i] = INFINITY;
+      }
+      else{
+        int nearClip = (int)(this->cameramodels[r]->getCamera().nearClip() * 1000);
+        int farClip = (int)(this->cameramodels[r]->getCamera().farClip() * 1000);
+        for (size_t i=0;i<len;++i){
+          int v = (int)(this->cameramodels[r]->FrameDepth()[i]*1000);
+          if (v<=nearClip || v>=farClip) v = 0;
+          ((uint16_t*)&(this->depthMsgs[r].data[0]))[i] = (uint16_t) ((v<=nearClip || v>=farClip) ? 0 : v );
+        }
+      }
+      
+      //invert the opengl weirdness
+      int height = this->depthMsgs[r].height - 1;
+      int linewidth = this->depthMsgs[r].width*sz;
+
+      char* temp = new char[linewidth];
+      for (int y = 0; y < (height+1)/2; y++) 
+      {
+           memcpy(temp,&this->depthMsgs[r].data[y*linewidth],linewidth);
+           memcpy(&(this->depthMsgs[r].data[y*linewidth]),&(this->depthMsgs[r].data[(height-y)*linewidth]),linewidth);
+           memcpy(&(this->depthMsgs[r].data[(height-y)*linewidth]),temp,linewidth);
+      }
+
+      this->depthMsgs[r].header.frame_id = mapName("camera", r);
+      this->depthMsgs[r].header.stamp = sim_time;
+      this->depth_pubs_[r].publish(this->depthMsgs[r]);
+    }
+    
+    //sending camera's tf and info only if image or depth topics are subscribed to
+    if (this->image_pubs_[r].getNumSubscribers()>0 && this->cameramodels[r]->FrameColor()
+    || this->depth_pubs_[r].getNumSubscribers()>0 && this->cameramodels[r]->FrameDepth())
+    {
+       
+      Stg::Pose lp = this->cameramodels[r]->GetPose();
+      tf::Quaternion Q; Q.setRPY(
+        (this->cameramodels[r]->getCamera().pitch()*M_PI/180.0)-M_PI, 
+        0.0, 
+        lp.a+(this->cameramodels[r]->getCamera().yaw()*M_PI/180.0)-M_PI
+        );
+        
+      tf::Transform tr =  tf::Transform(Q, tf::Point(lp.x, lp.y, this->positionmodels[r]->GetGeom().size.z+lp.z));
+      tf.sendTransform(tf::StampedTransform(tr, sim_time,
+                                          mapName("base_link", r),
+                                          mapName("camera", r)));
+      
+      this->cameraMsgs[r].header.frame_id = mapName("camera", r);
+      this->cameraMsgs[r].header.stamp = sim_time;
+      this->cameraMsgs[r].height = this->cameramodels[r]->getHeight();
+      this->cameraMsgs[r].width = this->cameramodels[r]->getWidth();
+      
+      double fx,fy,cx,cy;
+      cx = this->cameraMsgs[r].width / 2.0;
+      cy = this->cameraMsgs[r].height / 2.0;
+      double fovh = this->cameramodels[r]->getCamera().horizFov()*M_PI/180.0;
+      double fovv = this->cameramodels[r]->getCamera().vertFov()*M_PI/180.0;
+      //double fx_ = 1.43266615300557*this->cameramodels[r]->getWidth()/tan(fovh);
+      //double fy_ = 1.43266615300557*this->cameramodels[r]->getHeight()/tan(fovv);
+      fx = this->cameramodels[r]->getWidth()/(2*tan(fovh/2));
+      fy = this->cameramodels[r]->getHeight()/(2*tan(fovv/2));
+      
+      //ROS_INFO("fx=%.4f,%.4f; fy=%.4f,%.4f", fx, fx_, fy, fy_);
+ 
+      
+      this->cameraMsgs[r].D.resize(4, 0.0);
+
+      this->cameraMsgs[r].K[0] = fx;
+      this->cameraMsgs[r].K[2] = cx;
+      this->cameraMsgs[r].K[4] = fy;
+      this->cameraMsgs[r].K[5] = cy;
+      this->cameraMsgs[r].K[8] = 1.0;
+
+      this->cameraMsgs[r].R[0] = 1.0;
+      this->cameraMsgs[r].R[4] = 1.0;
+      this->cameraMsgs[r].R[8] = 1.0;
+
+      this->cameraMsgs[r].P[0] = fx;
+      this->cameraMsgs[r].P[2] = cx;
+      this->cameraMsgs[r].P[5] = fy;
+      this->cameraMsgs[r].P[6] = cy;
+      this->cameraMsgs[r].P[10] = 1.0;
+      
+      this->camera_pubs_[r].publish(this->cameraMsgs[r]);                                    
+
+    }   
+     
+    
   }
 
   this->clockMsg.clock = sim_time;
