@@ -2,6 +2,16 @@
 Changelog for package stage_ros
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+1.7.1 (2013-08-30)
+------------------
+* Fixing warnings
+* Small fixes
+* Added RGB+3D-sensor interface (Primesense/Kinect/Xtion).
+  * Publishes CameraInfo, depth image, RGBA image, tf (takes world-file pantilt paremeter into account)
+  * Supports the "old" configuration (laser+odom) as well as camera+odom, laser+camera+odom and odom-only.
+  Fixed laser transform height (previously was hardcoded at 0.15, now it takes robot height into account).
+* Introduced changes from https://github.com/rtv/Stage/issues/34 with some changes (does not require lasers to be present and works without cameras).
+
 1.7.0 (2013-06-27 18:15:07 -0700)
 ---------------------------------
 - Initial move over from old repository: https://code.ros.org/svn/ros-pkg/stacks/stage
