@@ -284,7 +284,7 @@ StageNode::SubscribeModels()
     }
     else if (this->cameramodels.size()>0)
     {
-      ROS_ERROR("no camera %d", this->cameramodels.size());
+      ROS_ERROR_STREAM("no camera " << this->cameramodels.size());
       return(-1);
     }
     if (this->lasermodels.size()>r)
@@ -539,8 +539,8 @@ StageNode::WorldCallback()
     }
     
     //sending camera's tf and info only if image or depth topics are subscribed to
-    if (this->image_pubs_[r].getNumSubscribers()>0 && this->cameramodels[r]->FrameColor()
-    || this->depth_pubs_[r].getNumSubscribers()>0 && this->cameramodels[r]->FrameDepth())
+    if ((this->image_pubs_[r].getNumSubscribers()>0 && this->cameramodels[r]->FrameColor())
+    || (this->depth_pubs_[r].getNumSubscribers()>0 && this->cameramodels[r]->FrameDepth()))
     {
        
       Stg::Pose lp = this->cameramodels[r]->GetPose();
