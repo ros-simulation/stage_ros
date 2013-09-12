@@ -547,7 +547,7 @@ StageNode::WorldCallback()
       tf::Quaternion Q; Q.setRPY(
         (this->cameramodels[r]->getCamera().pitch()*M_PI/180.0)-M_PI, 
         0.0, 
-        lp.a+(this->cameramodels[r]->getCamera().yaw()*M_PI/180.0)-M_PI
+        lp.a+(this->cameramodels[r]->getCamera().yaw()*M_PI/180.0)-this->positionmodels[r]->GetPose().a
         );
         
       tf::Transform tr =  tf::Transform(Q, tf::Point(lp.x, lp.y, this->positionmodels[r]->GetGeom().size.z+lp.z));
