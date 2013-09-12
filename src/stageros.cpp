@@ -427,10 +427,9 @@ StageNode::WorldCallback()
     // Also publish the ground truth pose and velocity
     Stg::Pose gpose = this->positionmodels[r]->GetGlobalPose();
     // Stg::Velocity gvel = this->positionmodels[r]->GetGlobalVelocity();
-    // Note that we correct for Stage's screwed-up coord system.
     tf::Quaternion q_gpose;
-    q_gpose.setRPY(0.0, 0.0, gpose.a-M_PI/2.0);
-    tf::Transform gt(q_gpose, tf::Point(gpose.y, -gpose.x, 0.0));
+    q_gpose.setRPY(0.0, 0.0, gpose.a);
+    tf::Transform gt(q_gpose, tf::Point(gpose.x, gpose.y, 0.0));
     tf::Quaternion q_gvel;
     // q_gvel.setRPY(0.0, 0.0, gvel.a-M_PI/2.0);
     // tf::Transform gv(q_gvel, tf::Point(gvel.y, -gvel.x, 0.0));
