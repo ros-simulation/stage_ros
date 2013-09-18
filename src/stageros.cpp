@@ -118,6 +118,11 @@ class StageNode
 
     // Current simulation time
     ros::Time sim_time;
+    
+    // Last time we saved global position (for velocity calculation).
+    ros::Time base_last_globalpos_time;
+    // Last published global pose of each robot
+    std::vector<Stg::Pose> base_last_globalpos;
 
   public:
     // Constructor; stage itself needs argc/argv.  fname is the .world file
@@ -207,7 +212,7 @@ StageNode::StageNode(int argc, char** argv, bool gui, const char* fname)
   Stg::Init( &argc, &argv );
 
   if(gui)
-    this->world = new Stg::WorldGui(800, 700, "Stage (ROS)");
+    this->world = new Stg::WorldGui(600, 400, "Stage (ROS)");
   else
     this->world = new Stg::World();
 
@@ -426,13 +431,24 @@ StageNode::WorldCallback()
 
     // Also publish the ground truth pose and velocity
     Stg::Pose gpose = this->positionmodels[r]->GetGlobalPose();
-    // Stg::Velocity gvel = this->positionmodels[r]->GetGlobalVelocity();
     tf::Quaternion q_gpose;
     q_gpose.setRPY(0.0, 0.0, gpose.a);
     tf::Transform gt(q_gpose, tf::Point(gpose.x, gpose.y, 0.0));
-    tf::Quaternion q_gvel;
-    // q_gvel.setRPY(0.0, 0.0, gvel.a-M_PI/2.0);
-    // tf::Transform gv(q_gvel, tf::Point(gvel.y, -gvel.x, 0.0));
+    // Velocity is 0 by default and will be set only if there is previous pose and time delta>0
+    Stg::Velocity gvel(0,0,0,0);
+    if (this->base_last_globalpos.size()>r){
+      Stg::Pose prevpose = this->base_last_globalpos.at(r);
+      double dT = (this->sim_time-this->base_last_globalpos_time).toSec();
+      if (dT>0)
+        gvel = Stg::Velocity(
+          (gpose.x - prevpose.x)/dT, 
+          (gpose.y - prevpose.y)/dT, 
+          (gpose.z - prevpose.z)/dT, 
+          Stg::normalize(gpose.a - prevpose.a)/dT
+        );
+      this->base_last_globalpos.at(r) = gpose;
+    }else //There are no previous readings, adding current pose...
+      this->base_last_globalpos.push_back(gpose);
 
     this->groundTruthMsgs[r].pose.pose.position.x     = gt.getOrigin().x();
     this->groundTruthMsgs[r].pose.pose.position.y     = gt.getOrigin().y();
@@ -441,18 +457,18 @@ StageNode::WorldCallback()
     this->groundTruthMsgs[r].pose.pose.orientation.y  = gt.getRotation().y();
     this->groundTruthMsgs[r].pose.pose.orientation.z  = gt.getRotation().z();
     this->groundTruthMsgs[r].pose.pose.orientation.w  = gt.getRotation().w();
-    // this->groundTruthMsgs[r].twist.twist.linear.x = gv.getOrigin().x();
-    // this->groundTruthMsgs[r].twist.twist.linear.y = gv.getOrigin().y();
-    //this->groundTruthMsgs[r].twist.twist.angular.z = tf::getYaw(gv.getRotation());
-    //this->groundTruthMsgs[r].twist.twist.linear.x = gvel.x;
-    //this->groundTruthMsgs[r].twist.twist.linear.y = gvel.y;
-    // this->groundTruthMsgs[r].twist.twist.angular.z = gvel.a;
+    this->groundTruthMsgs[r].twist.twist.linear.x = gvel.x;
+    this->groundTruthMsgs[r].twist.twist.linear.y = gvel.y;
+    this->groundTruthMsgs[r].twist.twist.linear.z = gvel.z;
+    this->groundTruthMsgs[r].twist.twist.angular.z = gvel.a;
 
     this->groundTruthMsgs[r].header.frame_id = mapName("odom", r);
     this->groundTruthMsgs[r].header.stamp = sim_time;
 
     this->ground_truth_pubs_[r].publish(this->groundTruthMsgs[r]);
   }
+  
+  this->base_last_globalpos_time = this->sim_time;
   
   for (size_t r = 0; r < this->cameramodels.size(); r++)
   {
