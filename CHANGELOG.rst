@@ -2,6 +2,13 @@
 Changelog for package stage_ros
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+1.7.2 (2013-09-19)
+------------------
+* Changed default GUI window size to 600x400
+* Added velocity to ground truth odometry
+* Fixed tf (yaw component) for the base_link->camera transform.
+* Fixed ground truth pose coordinate system
+
 1.7.1 (2013-08-30)
 ------------------
 * Fixing warnings
