@@ -250,7 +250,7 @@ StageNode::StageNode(int argc, char** argv, bool gui, const char* fname, bool us
     ROS_BREAK();
   }
   size_t numRobots = positionmodels.size();
-  ROS_INFO("found %u position and laser(%u)/camera(%u) pair%s in the file YEAH!", 
+  ROS_INFO("found %u position and laser(%u)/camera(%u) pair%s in the file", 
            (unsigned int)numRobots, (unsigned int) lasermodels.size(), (unsigned int) cameramodels.size(), (numRobots==1) ? "" : "s");
 
   this->laserMsgs = new sensor_msgs::LaserScan[numRobots];
