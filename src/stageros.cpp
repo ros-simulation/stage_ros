@@ -93,6 +93,7 @@ class StageNode
     ros::Publisher clock_pub_;
     
     bool isDepthCanonical;
+    bool use_model_names;
 
     // A helper function that is executed for each stage model.  We use it
     // to search for models of interest.
@@ -107,8 +108,8 @@ class StageNode
     }
 
     // Appends the given robot ID to the given message name.  If omitRobotID
-    // is true, an unaltered copy of the name is returned.
-    const char *mapName(const char *name, size_t robotID);
+    // is true, an unaltered copy of the name is returned.    
+    const char *mapName(const char *name, size_t robotID, Stg::Model* mod);
 
     tf::TransformBroadcaster tf;
 
@@ -127,7 +128,7 @@ class StageNode
   public:
     // Constructor; stage itself needs argc/argv.  fname is the .world file
     // that stage should load.
-    StageNode(int argc, char** argv, bool gui, const char* fname);
+    StageNode(int argc, char** argv, bool gui, const char* fname, bool use_model_names);
     ~StageNode();
 
     // Subscribe to models of interest.  Currently, we find and subscribe
@@ -151,12 +152,20 @@ class StageNode
 
 // since stageros is single-threaded, this is OK. revisit if that changes!
 const char *
-StageNode::mapName(const char *name, size_t robotID)
+StageNode::mapName(const char *name, size_t robotID, Stg::Model* mod)
 {
-  if (positionmodels.size() > 1)
+	bool umn = this->use_model_names;
+	
+  if ((positionmodels.size() > 1 ) || umn)
   {
     static char buf[100];
-    snprintf(buf, sizeof(buf), "/robot_%u/%s", (unsigned int)robotID, name);
+    std::size_t found = std::string(((Stg::Ancestor *) mod)->Token()).find(":");
+    
+    if ((found==std::string::npos) && umn)
+    	snprintf(buf, sizeof(buf), "/%s/%s", ((Stg::Ancestor *) mod)->Token(), name);
+	 else
+	 	snprintf(buf, sizeof(buf), "/robot_%u/%s", (unsigned int)robotID, name);
+
     return buf;
   }
   else
@@ -184,8 +193,9 @@ StageNode::cmdvelReceived(int idx, const boost::shared_ptr<geometry_msgs::Twist 
   this->base_last_cmd = this->sim_time;
 }
 
-StageNode::StageNode(int argc, char** argv, bool gui, const char* fname)
+StageNode::StageNode(int argc, char** argv, bool gui, const char* fname, bool use_model_names)
 {
+  this->use_model_names = use_model_names;
   this->sim_time.fromSec(0.0);
   this->base_last_cmd.fromSec(0.0);
   double t;
@@ -240,7 +250,7 @@ StageNode::StageNode(int argc, char** argv, bool gui, const char* fname)
     ROS_BREAK();
   }
   size_t numRobots = positionmodels.size();
-  ROS_INFO("found %u position and laser(%u)/camera(%u) pair%s in the file", 
+  ROS_INFO("found %u position and laser(%u)/camera(%u) pair%s in the file YEAH!", 
            (unsigned int)numRobots, (unsigned int) lasermodels.size(), (unsigned int) cameramodels.size(), (numRobots==1) ? "" : "s");
 
   this->laserMsgs = new sensor_msgs::LaserScan[numRobots];
@@ -293,15 +303,15 @@ StageNode::SubscribeModels()
       return(-1);
     }
     if (this->lasermodels.size()>r)
-      laser_pubs_.push_back(n_.advertise<sensor_msgs::LaserScan>(mapName(BASE_SCAN,r), 10));
-    odom_pubs_.push_back(n_.advertise<nav_msgs::Odometry>(mapName(ODOM,r), 10));
-    ground_truth_pubs_.push_back(n_.advertise<nav_msgs::Odometry>(mapName(BASE_POSE_GROUND_TRUTH,r), 10));
+      laser_pubs_.push_back(n_.advertise<sensor_msgs::LaserScan>(mapName(BASE_SCAN,r,(Stg::Model *)positionmodels[r]), 10));
+    odom_pubs_.push_back(n_.advertise<nav_msgs::Odometry>(mapName(ODOM,r,(Stg::Model *)positionmodels[r]), 10));
+    ground_truth_pubs_.push_back(n_.advertise<nav_msgs::Odometry>(mapName(BASE_POSE_GROUND_TRUTH,r,(Stg::Model *)positionmodels[r]), 10));
     if (this->cameramodels.size()>r){
-      image_pubs_.push_back(n_.advertise<sensor_msgs::Image>(mapName(IMAGE,r), 10));
-      depth_pubs_.push_back(n_.advertise<sensor_msgs::Image>(mapName(DEPTH,r), 10));
-      camera_pubs_.push_back(n_.advertise<sensor_msgs::CameraInfo>(mapName(CAMERA_INFO,r), 10));
+      image_pubs_.push_back(n_.advertise<sensor_msgs::Image>(mapName(IMAGE,r,(Stg::Model *)positionmodels[r]), 10));
+      depth_pubs_.push_back(n_.advertise<sensor_msgs::Image>(mapName(DEPTH,r,(Stg::Model *)positionmodels[r]), 10));
+      camera_pubs_.push_back(n_.advertise<sensor_msgs::CameraInfo>(mapName(CAMERA_INFO,r,(Stg::Model *)positionmodels[r]), 10));
     }
-    cmdvel_subs_.push_back(n_.subscribe<geometry_msgs::Twist>(mapName(CMD_VEL,r), 10, boost::bind(&StageNode::cmdvelReceived, this, r, _1)));
+    cmdvel_subs_.push_back(n_.subscribe<geometry_msgs::Twist>(mapName(CMD_VEL,r,(Stg::Model *)positionmodels[r]), 10, boost::bind(&StageNode::cmdvelReceived, this, r, _1)));
   }
   clock_pub_ = n_.advertise<rosgraph_msgs::Clock>("/clock",10);
   return(0);
@@ -374,7 +384,7 @@ StageNode::WorldCallback()
 					this->laserMsgs[r].intensities[i] = (uint8_t)s.intensities[i];
 				}
 			
-      this->laserMsgs[r].header.frame_id = mapName("base_laser_link", r);
+      this->laserMsgs[r].header.frame_id = mapName("base_laser_link", r,(Stg::Model *)positionmodels[r]);
       this->laserMsgs[r].header.stamp = sim_time;
       this->laser_pubs_[r].publish(this->laserMsgs[r]);
 			}
@@ -387,8 +397,8 @@ StageNode::WorldCallback()
     tf::Transform txLaser =  tf::Transform(laserQ,
                                             tf::Point(lp.x, lp.y, this->positionmodels[r]->GetGeom().size.z+lp.z));
     tf.sendTransform(tf::StampedTransform(txLaser, sim_time,
-                                          mapName("base_link", r),
-                                          mapName("base_laser_link", r)));
+                                          mapName("base_link", r,(Stg::Model *)positionmodels[r]),
+                                          mapName("base_laser_link", r,(Stg::Model *)positionmodels[r])));
     }
     
     for (size_t r = 0; r < this->positionmodels.size(); r++)
@@ -398,8 +408,8 @@ StageNode::WorldCallback()
                              tf::Point(0, 0, 0));
     tf.sendTransform(tf::StampedTransform(txIdentity,
                                           sim_time,
-                                          mapName("base_footprint", r),
-                                          mapName("base_link", r)));
+                                          mapName("base_footprint", r,(Stg::Model *)positionmodels[r]),
+                                          mapName("base_link", r,(Stg::Model *)positionmodels[r])));
 
     // Get latest odometry data
     // Translate into ROS message format and publish
@@ -414,7 +424,7 @@ StageNode::WorldCallback()
     //@todo Publish stall on a separate topic when one becomes available
     //this->odomMsgs[r].stall = this->positionmodels[r]->Stall();
     //
-    this->odomMsgs[r].header.frame_id = mapName("odom", r);
+    this->odomMsgs[r].header.frame_id = mapName("odom", r,(Stg::Model *)positionmodels[r]);
     this->odomMsgs[r].header.stamp = sim_time;
 
     this->odom_pubs_[r].publish(this->odomMsgs[r]);
@@ -426,8 +436,8 @@ StageNode::WorldCallback()
                          tf::Point(odomMsgs[r].pose.pose.position.x,
                                    odomMsgs[r].pose.pose.position.y, 0.0));
     tf.sendTransform(tf::StampedTransform(txOdom, sim_time,
-                                          mapName("odom", r),
-                                          mapName("base_footprint", r)));
+                                          mapName("odom", r,(Stg::Model *)positionmodels[r]),
+                                          mapName("base_footprint", r,(Stg::Model *)positionmodels[r])));
 
     // Also publish the ground truth pose and velocity
     Stg::Pose gpose = this->positionmodels[r]->GetGlobalPose();
@@ -462,7 +472,7 @@ StageNode::WorldCallback()
     this->groundTruthMsgs[r].twist.twist.linear.z = gvel.z;
     this->groundTruthMsgs[r].twist.twist.angular.z = gvel.a;
 
-    this->groundTruthMsgs[r].header.frame_id = mapName("odom", r);
+    this->groundTruthMsgs[r].header.frame_id = mapName("odom", r,(Stg::Model *)positionmodels[r]);
     this->groundTruthMsgs[r].header.stamp = sim_time;
 
     this->ground_truth_pubs_[r].publish(this->groundTruthMsgs[r]);
@@ -496,7 +506,7 @@ StageNode::WorldCallback()
             memcpy(&(this->imageMsgs[r].data[(height-y)*linewidth]),temp,linewidth);
        }
 
-        this->imageMsgs[r].header.frame_id = mapName("camera", r);
+        this->imageMsgs[r].header.frame_id = mapName("camera", r,(Stg::Model *)positionmodels[r]);
         this->imageMsgs[r].header.stamp = sim_time;
 
         this->image_pubs_[r].publish(this->imageMsgs[r]);      
@@ -548,7 +558,7 @@ StageNode::WorldCallback()
            memcpy(&(this->depthMsgs[r].data[(height-y)*linewidth]),temp,linewidth);
       }
 
-      this->depthMsgs[r].header.frame_id = mapName("camera", r);
+      this->depthMsgs[r].header.frame_id = mapName("camera", r,(Stg::Model *)positionmodels[r]);
       this->depthMsgs[r].header.stamp = sim_time;
       this->depth_pubs_[r].publish(this->depthMsgs[r]);
     }
@@ -567,10 +577,10 @@ StageNode::WorldCallback()
         
       tf::Transform tr =  tf::Transform(Q, tf::Point(lp.x, lp.y, this->positionmodels[r]->GetGeom().size.z+lp.z));
       tf.sendTransform(tf::StampedTransform(tr, sim_time,
-                                          mapName("base_link", r),
-                                          mapName("camera", r)));
+                                          mapName("base_link", r,(Stg::Model *)positionmodels[r]),
+                                          mapName("camera", r,(Stg::Model *)positionmodels[r])));
       
-      this->cameraMsgs[r].header.frame_id = mapName("camera", r);
+      this->cameraMsgs[r].header.frame_id = mapName("camera", r,(Stg::Model *)positionmodels[r]);
       this->cameraMsgs[r].header.stamp = sim_time;
       this->cameraMsgs[r].height = this->cameramodels[r]->getHeight();
       this->cameraMsgs[r].width = this->cameramodels[r]->getWidth();
@@ -629,13 +639,16 @@ main(int argc, char** argv)
   ros::init(argc, argv, "stageros");
 
   bool gui = true;
+  bool use_model_names = false;
   for(int i=0;i<(argc-1);i++)
   {
     if(!strcmp(argv[i], "-g"))
       gui = false;
+    if(!strcmp(argv[i], "-u"))
+    	use_model_names = true;
   }
 
-  StageNode sn(argc-1,argv,gui,argv[argc-1]);
+  StageNode sn(argc-1,argv,gui,argv[argc-1], use_model_names);
 
   if(sn.SubscribeModels() != 0)
     exit(-1);
