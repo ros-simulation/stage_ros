@@ -162,9 +162,12 @@ StageNode::mapName(const char *name, size_t robotID, Stg::Model* mod)
     std::size_t found = std::string(((Stg::Ancestor *) mod)->Token()).find(":");
     
     if ((found==std::string::npos) && umn)
+    {
     	snprintf(buf, sizeof(buf), "/%s/%s", ((Stg::Ancestor *) mod)->Token(), name);
-	 else
-	 	snprintf(buf, sizeof(buf), "/robot_%u/%s", (unsigned int)robotID, name);
+    }else
+    {
+ 	snprintf(buf, sizeof(buf), "/robot_%u/%s", (unsigned int)robotID, name);
+    }
 
     return buf;
   }
