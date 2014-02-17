@@ -164,7 +164,8 @@ StageNode::mapName(const char *name, size_t robotID, Stg::Model* mod)
     if ((found==std::string::npos) && umn)
     {
     	snprintf(buf, sizeof(buf), "/%s/%s", ((Stg::Ancestor *) mod)->Token(), name);
-    }else
+    }
+    else
     {
  	snprintf(buf, sizeof(buf), "/robot_%u/%s", (unsigned int)robotID, name);
     }
@@ -306,15 +307,15 @@ StageNode::SubscribeModels()
       return(-1);
     }
     if (this->lasermodels.size()>r)
-      laser_pubs_.push_back(n_.advertise<sensor_msgs::LaserScan>(mapName(BASE_SCAN,r,(Stg::Model *)positionmodels[r]), 10));
-    odom_pubs_.push_back(n_.advertise<nav_msgs::Odometry>(mapName(ODOM,r,(Stg::Model *)positionmodels[r]), 10));
-    ground_truth_pubs_.push_back(n_.advertise<nav_msgs::Odometry>(mapName(BASE_POSE_GROUND_TRUTH,r,(Stg::Model *)positionmodels[r]), 10));
+      laser_pubs_.push_back(n_.advertise<sensor_msgs::LaserScan>(mapName(BASE_SCAN,r,static_cast<Stg::Model*>(positionmodels[r])), 10));
+    odom_pubs_.push_back(n_.advertise<nav_msgs::Odometry>(mapName(ODOM,r,static_cast<Stg::Model*>(positionmodels[r])), 10));
+    ground_truth_pubs_.push_back(n_.advertise<nav_msgs::Odometry>(mapName(BASE_POSE_GROUND_TRUTH,r,static_cast<Stg::Model*>(positionmodels[r])), 10));
     if (this->cameramodels.size()>r){
-      image_pubs_.push_back(n_.advertise<sensor_msgs::Image>(mapName(IMAGE,r,(Stg::Model *)positionmodels[r]), 10));
-      depth_pubs_.push_back(n_.advertise<sensor_msgs::Image>(mapName(DEPTH,r,(Stg::Model *)positionmodels[r]), 10));
-      camera_pubs_.push_back(n_.advertise<sensor_msgs::CameraInfo>(mapName(CAMERA_INFO,r,(Stg::Model *)positionmodels[r]), 10));
+      image_pubs_.push_back(n_.advertise<sensor_msgs::Image>(mapName(IMAGE,r,static_cast<Stg::Model*>(positionmodels[r])), 10));
+      depth_pubs_.push_back(n_.advertise<sensor_msgs::Image>(mapName(DEPTH,r,static_cast<Stg::Model*>(positionmodels[r])), 10));
+      camera_pubs_.push_back(n_.advertise<sensor_msgs::CameraInfo>(mapName(CAMERA_INFO,r,static_cast<Stg::Model*>(positionmodels[r])), 10));
     }
-    cmdvel_subs_.push_back(n_.subscribe<geometry_msgs::Twist>(mapName(CMD_VEL,r,(Stg::Model *)positionmodels[r]), 10, boost::bind(&StageNode::cmdvelReceived, this, r, _1)));
+    cmdvel_subs_.push_back(n_.subscribe<geometry_msgs::Twist>(mapName(CMD_VEL,r,static_cast<Stg::Model*>(positionmodels[r])), 10, boost::bind(&StageNode::cmdvelReceived, this, r, _1)));
   }
   clock_pub_ = n_.advertise<rosgraph_msgs::Clock>("/clock",10);
   return(0);
@@ -387,7 +388,7 @@ StageNode::WorldCallback()
 					this->laserMsgs[r].intensities[i] = (uint8_t)s.intensities[i];
 				}
 			
-      this->laserMsgs[r].header.frame_id = mapName("base_laser_link", r,(Stg::Model *)positionmodels[r]);
+      this->laserMsgs[r].header.frame_id = mapName("base_laser_link", r,static_cast<Stg::Model*>(positionmodels[r]));
       this->laserMsgs[r].header.stamp = sim_time;
       this->laser_pubs_[r].publish(this->laserMsgs[r]);
 			}
@@ -400,8 +401,8 @@ StageNode::WorldCallback()
     tf::Transform txLaser =  tf::Transform(laserQ,
                                             tf::Point(lp.x, lp.y, this->positionmodels[r]->GetGeom().size.z+lp.z));
     tf.sendTransform(tf::StampedTransform(txLaser, sim_time,
-                                          mapName("base_link", r,(Stg::Model *)positionmodels[r]),
-                                          mapName("base_laser_link", r,(Stg::Model *)positionmodels[r])));
+                                          mapName("base_link", r,static_cast<Stg::Model*>(positionmodels[r])),
+                                          mapName("base_laser_link", r,static_cast<Stg::Model*>(positionmodels[r]))));
     }
     
     for (size_t r = 0; r < this->positionmodels.size(); r++)
@@ -411,8 +412,8 @@ StageNode::WorldCallback()
                              tf::Point(0, 0, 0));
     tf.sendTransform(tf::StampedTransform(txIdentity,
                                           sim_time,
-                                          mapName("base_footprint", r,(Stg::Model *)positionmodels[r]),
-                                          mapName("base_link", r,(Stg::Model *)positionmodels[r])));
+                                          mapName("base_footprint", r,static_cast<Stg::Model*>(positionmodels[r])),
+                                          mapName("base_link", r,static_cast<Stg::Model*>(positionmodels[r]))));
 
     // Get latest odometry data
     // Translate into ROS message format and publish
@@ -427,7 +428,7 @@ StageNode::WorldCallback()
     //@todo Publish stall on a separate topic when one becomes available
     //this->odomMsgs[r].stall = this->positionmodels[r]->Stall();
     //
-    this->odomMsgs[r].header.frame_id = mapName("odom", r,(Stg::Model *)positionmodels[r]);
+    this->odomMsgs[r].header.frame_id = mapName("odom", r,static_cast<Stg::Model*>(positionmodels[r]));
     this->odomMsgs[r].header.stamp = sim_time;
 
     this->odom_pubs_[r].publish(this->odomMsgs[r]);
@@ -439,8 +440,8 @@ StageNode::WorldCallback()
                          tf::Point(odomMsgs[r].pose.pose.position.x,
                                    odomMsgs[r].pose.pose.position.y, 0.0));
     tf.sendTransform(tf::StampedTransform(txOdom, sim_time,
-                                          mapName("odom", r,(Stg::Model *)positionmodels[r]),
-                                          mapName("base_footprint", r,(Stg::Model *)positionmodels[r])));
+                                          mapName("odom", r,static_cast<Stg::Model*>(positionmodels[r])),
+                                          mapName("base_footprint", r,static_cast<Stg::Model*>(positionmodels[r]))));
 
     // Also publish the ground truth pose and velocity
     Stg::Pose gpose = this->positionmodels[r]->GetGlobalPose();
@@ -475,7 +476,7 @@ StageNode::WorldCallback()
     this->groundTruthMsgs[r].twist.twist.linear.z = gvel.z;
     this->groundTruthMsgs[r].twist.twist.angular.z = gvel.a;
 
-    this->groundTruthMsgs[r].header.frame_id = mapName("odom", r,(Stg::Model *)positionmodels[r]);
+    this->groundTruthMsgs[r].header.frame_id = mapName("odom", r,static_cast<Stg::Model*>(positionmodels[r]));
     this->groundTruthMsgs[r].header.stamp = sim_time;
 
     this->ground_truth_pubs_[r].publish(this->groundTruthMsgs[r]);
@@ -509,7 +510,7 @@ StageNode::WorldCallback()
             memcpy(&(this->imageMsgs[r].data[(height-y)*linewidth]),temp,linewidth);
        }
 
-        this->imageMsgs[r].header.frame_id = mapName("camera", r,(Stg::Model *)positionmodels[r]);
+        this->imageMsgs[r].header.frame_id = mapName("camera", r,static_cast<Stg::Model*>(positionmodels[r]));
         this->imageMsgs[r].header.stamp = sim_time;
 
         this->image_pubs_[r].publish(this->imageMsgs[r]);      
@@ -561,7 +562,7 @@ StageNode::WorldCallback()
            memcpy(&(this->depthMsgs[r].data[(height-y)*linewidth]),temp,linewidth);
       }
 
-      this->depthMsgs[r].header.frame_id = mapName("camera", r,(Stg::Model *)positionmodels[r]);
+      this->depthMsgs[r].header.frame_id = mapName("camera", r,static_cast<Stg::Model*>(positionmodels[r]));
       this->depthMsgs[r].header.stamp = sim_time;
       this->depth_pubs_[r].publish(this->depthMsgs[r]);
     }
@@ -580,10 +581,10 @@ StageNode::WorldCallback()
         
       tf::Transform tr =  tf::Transform(Q, tf::Point(lp.x, lp.y, this->positionmodels[r]->GetGeom().size.z+lp.z));
       tf.sendTransform(tf::StampedTransform(tr, sim_time,
-                                          mapName("base_link", r,(Stg::Model *)positionmodels[r]),
-                                          mapName("camera", r,(Stg::Model *)positionmodels[r])));
+                                          mapName("base_link", r,static_cast<Stg::Model*>(positionmodels[r])),
+                                          mapName("camera", r,static_cast<Stg::Model*>(positionmodels[r]))));
       
-      this->cameraMsgs[r].header.frame_id = mapName("camera", r,(Stg::Model *)positionmodels[r]);
+      this->cameraMsgs[r].header.frame_id = mapName("camera", r,static_cast<Stg::Model*>(positionmodels[r]));
       this->cameraMsgs[r].header.stamp = sim_time;
       this->cameraMsgs[r].height = this->cameramodels[r]->getHeight();
       this->cameraMsgs[r].width = this->cameramodels[r]->getWidth();
