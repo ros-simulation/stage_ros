@@ -120,8 +120,6 @@ private:
     // is true, an unaltered copy of the name is returned.
     const char *mapName(const char *name, size_t robotID, Stg::Model* mod) const;
     const char *mapName(const char *name, size_t robotID, size_t deviceID, Stg::Model* mod) const;
-    const char *mapName(const char *name, size_t robotID) const;
-    const char *mapName(const char *name, size_t robotID, size_t deviceID) const;
 
     tf::TransformBroadcaster tf;
 
@@ -219,58 +217,6 @@ StageNode::mapName(const char *name, size_t robotID, size_t deviceID, Stg::Model
     }
 }
 
-const char *
-StageNode::mapName(const char *name, size_t robotID) const
-{
-    bool umn = this->use_model_names;
-
-    if ((positionmodels.size() > 1 ) || umn)
-    {
-        static char buf[100];
-        Stg::Model const* mod = static_cast<Stg::Model*>(this->robotmodels_[robotID]->positionmodel);
-        std::size_t found = std::string(((Stg::Ancestor *) mod)->Token()).find(":");
-
-        if ((found==std::string::npos) && umn)
-        {
-            snprintf(buf, sizeof(buf), "/%s/%s", ((Stg::Ancestor *) mod)->Token(), name);
-        }
-        else
-        {
-            snprintf(buf, sizeof(buf), "/robot_%u/%s", (unsigned int)robotID, name);
-        }
-
-        return buf;
-    }
-    else
-        return name;
-}
-
-const char *
-StageNode::mapName(const char *name, size_t robotID, size_t deviceID) const
-{
-    bool umn = this->use_model_names;
-
-    if ((positionmodels.size() > 1 ) || umn)
-    {
-        static char buf[100];
-        Stg::Model const* mod = static_cast<Stg::Model*>(this->robotmodels_[robotID]->positionmodel);
-        std::size_t found = std::string(((Stg::Ancestor *) mod)->Token()).find(":");
-
-        if ((found==std::string::npos) && umn)
-        {
-            snprintf(buf, sizeof(buf), "/%s/%s_%u", ((Stg::Ancestor *) mod)->Token(), name, (unsigned int)deviceID);
-        }
-        else
-        {
-            snprintf(buf, sizeof(buf), "/robot_%u/%s_%u", (unsigned int)robotID, name, (unsigned int)deviceID);
-        }
-
-        return buf;
-    }
-    else
-        return name;
-}
-
 void
 StageNode::ghfunc(Stg::Model* mod, StageNode* node)
 {
@@ -336,30 +282,6 @@ StageNode::StageNode(int argc, char** argv, bool gui, const char* fname, bool us
     this->world->AddUpdateCallback((Stg::world_callback_t)s_update, this);
 
     this->world->ForEachDescendant((Stg::model_callback_t)ghfunc, this);
-    /*if (lasermodels.size() > 0 && lasermodels.size() != positionmodels.size())
-    {
-        ROS_FATAL("number of position models and laser models must be equal in "
-                  "the world file.");
-        ROS_BREAK();
-    }
-    else if (cameramodels.size() > 0 && cameramodels.size() != positionmodels.size())
-    {
-        ROS_FATAL("number of position models and camera models must be equal in "
-                  "the world file.");
-        ROS_BREAK();
-    }
-    size_t numRobots = positionmodels.size();
-    ROS_INFO("found %u position and laser(%u)/camera(%u) pair%s in the file",
-             (unsigned int)numRobots, (unsigned int) lasermodels.size(), (unsigned int) cameramodels.size(), (numRobots==1) ? "" : "s");
-*/
-    /*
-    this->laserMsgs = new sensor_msgs::LaserScan[numRobots];
-    this->odomMsgs = new nav_msgs::Odometry[numRobots];
-    this->groundTruthMsgs = new nav_msgs::Odometry[numRobots];
-    this->imageMsgs = new sensor_msgs::Image[numRobots];
-    this->depthMsgs = new sensor_msgs::Image[numRobots];
-    this->cameraMsgs = new sensor_msgs::CameraInfo[numRobots];
-    */
 }
 
 
@@ -533,7 +455,6 @@ StageNode::WorldCallback()
         }
 
         //the position of the robot
-        //tf::Transform txIdentity(tf::createIdentityQuaternion(), tf::Point(0, 0, 0));
         tf.sendTransform(tf::StampedTransform(tf::Transform::getIdentity(),
                                               sim_time,
                                               mapName("base_footprint", r, static_cast<Stg::Model*>(robotmodel->positionmodel)),
