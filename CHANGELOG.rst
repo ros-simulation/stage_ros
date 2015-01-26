@@ -2,8 +2,8 @@
 Changelog for package stage_ros
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-Forthcoming
------------
+1.7.3 (2015-01-26)
+------------------
 * Split up ``fltk`` dep into ``libfltk-dev`` and ``fluid``, only ``run_depend``'ing on fluid.
 * Now supports multiple robots with multiple sensors.
 * Fixed a bug on systems that cannot populate FLTK_INCLUDE_DIRS.
