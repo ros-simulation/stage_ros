@@ -2,6 +2,15 @@
 Changelog for package stage_ros
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+Forthcoming
+-----------
+* Split up ``fltk`` dep into ``libfltk-dev`` and ``fluid``, only ``run_depend``'ing on fluid.
+* Now supports multiple robots with multiple sensors.
+* Fixed a bug on systems that cannot populate FLTK_INCLUDE_DIRS.
+* Updated topurg model from "laser" to "ranger".
+* Added -u option to use name property of position models as its namespace instead of "robot_0", "robot_1", etc.
+* Contributors: Gustavo Velasco Hernández, Gustavo Velasco-Hernández, Pablo Urcola, Wayne Chang, William Woodall
+
 1.7.2 (2013-09-19)
 ------------------
 * Changed default GUI window size to 600x400
