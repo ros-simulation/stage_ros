@@ -2,8 +2,8 @@
 Changelog for package stage_ros
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-Forthcoming
------------
+1.7.4 (2015-03-04)
+------------------
 * Added missing -ldl flag on newer versions of Ubuntu
 * Contributors: William Woodall
 
