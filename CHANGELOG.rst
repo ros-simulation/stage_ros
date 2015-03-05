@@ -2,6 +2,11 @@
 Changelog for package stage_ros
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+Forthcoming
+-----------
+* Added missing -ldl flag on newer versions of Ubuntu
+* Contributors: William Woodall
+
 1.7.3 (2015-01-26)
 ------------------
 * Split up ``fltk`` dep into ``libfltk-dev`` and ``fluid``, only ``run_depend``'ing on fluid.
