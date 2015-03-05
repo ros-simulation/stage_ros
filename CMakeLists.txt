@@ -29,12 +29,7 @@ include_directories(
   ${Stage_INCLUDE_DIRS}
 )
 
-catkin_package(
-  INCLUDE_DIRS ${Stage_INCLUDE_DIRS}
-  LIBRARIES stage_ros ${Stage_LIBRARIES}
-  CATKIN_DEPENDS geometry_msgs nav_msgs roscpp sensor_msgs std_msgs tf
-  DEPENDS Boost
-)
+catkin_package()
 
 # Declare a cpp executable
 add_executable(stageros src/stageros.cpp)
