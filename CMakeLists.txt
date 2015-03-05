@@ -38,7 +38,11 @@ catkin_package(
 
 # Declare a cpp executable
 add_executable(stageros src/stageros.cpp)
-target_link_libraries(stageros ${catkin_LIBRARIES} ${Boost_LIBRARIES} ${FLTK_LIBRARIES} ${Stage_LIBRARIES})
+set(${PROJECT_NAME}_extra_libs "")
+if(UNIX AND NOT APPLE)
+  set(${PROJECT_NAME}_extra_libs dl)
+endif()
+target_link_libraries(stageros ${catkin_LIBRARIES} ${Boost_LIBRARIES} ${FLTK_LIBRARIES} ${Stage_LIBRARIES} ${${PROJECT_NAME}_extra_libs})
 if(catkin_EXPORTED_TARGETS)
 	add_dependencies(stageros ${catkin_EXPORTED_TARGETS})
 endif()
