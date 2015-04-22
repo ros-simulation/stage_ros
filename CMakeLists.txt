@@ -61,4 +61,6 @@ install(DIRECTORY world
 
 ## Tests
 
-add_rostest(test/hztest.xml)
+if(CATKIN_ENABLE_TESTING)
+	add_rostest(test/hztest.xml)
+endif()
