@@ -1,7 +1,15 @@
 cmake_minimum_required(VERSION 2.8.3)
 project(stage_ros)
 
-find_package(catkin REQUIRED COMPONENTS geometry_msgs nav_msgs roscpp rostest sensor_msgs std_msgs tf)
+find_package(catkin REQUIRED
+  COMPONENTS
+    geometry_msgs
+    nav_msgs
+    roscpp
+    sensor_msgs
+    std_msgs
+    tf
+)
 
 find_package(Boost REQUIRED COMPONENTS system thread)
 
@@ -37,9 +45,15 @@ set(${PROJECT_NAME}_extra_libs "")
 if(UNIX AND NOT APPLE)
   set(${PROJECT_NAME}_extra_libs dl)
 endif()
-target_link_libraries(stageros ${catkin_LIBRARIES} ${Boost_LIBRARIES} ${FLTK_LIBRARIES} ${Stage_LIBRARIES} ${${PROJECT_NAME}_extra_libs})
+target_link_libraries(stageros
+  ${catkin_LIBRARIES}
+  ${Boost_LIBRARIES}
+  ${FLTK_LIBRARIES}
+  ${Stage_LIBRARIES}
+  ${${PROJECT_NAME}_extra_libs}
+)
 if(catkin_EXPORTED_TARGETS)
-	add_dependencies(stageros ${catkin_EXPORTED_TARGETS})
+  add_dependencies(stageros ${catkin_EXPORTED_TARGETS})
 endif()
 
 ## Install
@@ -61,4 +75,7 @@ install(DIRECTORY world
 
 ## Tests
 
-add_rostest(test/hztest.xml)
+if(CATKIN_ENABLE_TESTING)
+  find_package(rostest REQUIRED)
+  add_rostest(test/hztest.xml)
+endif()
