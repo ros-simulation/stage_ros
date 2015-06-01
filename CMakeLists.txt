@@ -8,6 +8,7 @@ find_package(catkin REQUIRED
     roscpp
     sensor_msgs
     std_msgs
+    std_srvs
     tf
 )
 
