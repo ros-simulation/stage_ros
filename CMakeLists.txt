@@ -14,6 +14,7 @@ find_package(catkin REQUIRED
 
 find_package(Boost REQUIRED COMPONENTS system thread)
 
+set (FLTK_SKIP_FLUID TRUE)
 find_package(FLTK REQUIRED)
 if(FLTK_FOUND)
   # FindFLTK.cmake doesn't populate FLTK_INCLUDE_DIRS on some systems,
