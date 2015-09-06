@@ -14,27 +14,12 @@ find_package(catkin REQUIRED
 
 find_package(Boost REQUIRED COMPONENTS system thread)
 
-find_package(FLTK REQUIRED)
-if(FLTK_FOUND)
-  # FindFLTK.cmake doesn't populate FLTK_INCLUDE_DIRS on some systems,
-  # so we try to use FLTK_INCLUDE_DIR if we need to.
-  if("${FLTK_INCLUDE_DIRS}" STREQUAL "")
-    set(FLTK_INCLUDE_DIRS "${FLTK_INCLUDE_DIR}")
-  endif()
-  message(status "FLTK_LIBRARIES=" ${FLTK_LIBRARIES})
-  message(status "FLTK_INCLUDE_DIR=" ${FLTK_INCLUDE_DIR})
-  message(status "FLTK_INCLUDE_DIRS=" ${FLTK_INCLUDE_DIRS})
-else()
-  message(fatal_error "FLTK not found...aborting!")
-endif()
-
 set(Stage_DIR cmake)
 find_package(Stage REQUIRED)
 
 include_directories(
   ${catkin_INCLUDE_DIRS}
   ${Boost_INCLUDE_DIRS}
-  ${FLTK_INCLUDE_DIRS}
   ${Stage_INCLUDE_DIRS}
 )
 
@@ -49,7 +34,6 @@ endif()
 target_link_libraries(stageros
   ${catkin_LIBRARIES}
   ${Boost_LIBRARIES}
-  ${FLTK_LIBRARIES}
   ${Stage_LIBRARIES}
   ${${PROJECT_NAME}_extra_libs}
 )
