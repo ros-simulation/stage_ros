@@ -14,13 +14,12 @@ find_package(catkin REQUIRED
 
 find_package(Boost REQUIRED COMPONENTS system thread)
 
-set(Stage_DIR cmake)
-find_package(Stage REQUIRED)
+find_package(stage REQUIRED)
 
 include_directories(
   ${catkin_INCLUDE_DIRS}
   ${Boost_INCLUDE_DIRS}
-  ${Stage_INCLUDE_DIRS}
+  ${STAGE_INCLUDE_DIRS}
 )
 
 catkin_package()
@@ -34,7 +33,7 @@ endif()
 target_link_libraries(stageros
   ${catkin_LIBRARIES}
   ${Boost_LIBRARIES}
-  ${Stage_LIBRARIES}
+  ${STAGE_LIBRARIES}
   ${${PROJECT_NAME}_extra_libs}
 )
 if(catkin_EXPORTED_TARGETS)
