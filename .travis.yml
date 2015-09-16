@@ -18,12 +18,31 @@ install:
   - mkdir deps
   - cd deps
   - touch CATKIN_IGNORE
-  - rosinstall_generator --rosdistro $CI_ROS_DISTRO --tar --deps stage_ros > deps.rosinstall
+  - rosinstall_generator --rosdistro $CI_ROS_DISTRO --tar --deps --deps-only stage_ros > deps.rosinstall
   - wstool init ./src -j10 deps.rosinstall
-# Use rosdep to get the missing dependencies
-  - rosdep install --default-yes --from-paths ./src --ignore-src --rosdistro $CI_ROS_DISTRO
+# Temporarily get std_srvs until a new version of stage_ros is released
+  - rosinstall_generator --rosdistro $CI_ROS_DISTRO --tar std_srvs > std_srvs.rosinstall
+  - wstool merge -t src std_srvs.rosinstall
+  - wstool up -t src
+# Use rosdep to get the missing dependencies, except console bridge and lz4
+  - rosdep install --default-yes --from-paths ./src --ignore-src --rosdistro $CI_ROS_DISTRO --skip-keys lz4 --skip-keys libconsole-bridge-dev
+# Get lz4
+  - sudo add-apt-repository -y ppa:gezakovacs/lz4
+  - sudo apt-get update
+  - sudo apt-get install -y liblz4-dev
+# Get libconsole-bridge-dev package for precise
+  - mkdir build_console_bridge
+  - cd build_console_bridge
+  - git clone https://github.com/ros/console_bridge.git
+  - cd console_bridge/
+  - mkdir build
+  - cd build/
+  - cmake ..
+  - make
+  - sudo make install
+  - cd ../../..
 # Build the deps
-  - ./src/catkin/bin/catkin_make_isolated --install
+  - ./src/catkin/bin/catkin_make_isolated --install -j1
   - cd ..
 script:
   - source deps/install_isolated/setup.bash
