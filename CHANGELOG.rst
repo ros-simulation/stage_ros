@@ -2,6 +2,12 @@
 Changelog for package stage_ros
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+Forthcoming
+-----------
+* Removed all references to FLTK/Fluid and use the upstream CMake config file instead.
+* Added ``reset_positions`` service to stage (adds dependency on ``std_srvs``).
+* Contributors: Aurélien Ballier, Daniel Claes, Scott K Logan, William Woodall
+
 1.7.4 (2015-03-04)
 ------------------
 * Added missing -ldl flag on newer versions of Ubuntu
