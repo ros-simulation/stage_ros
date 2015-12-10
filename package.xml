@@ -36,4 +36,6 @@
   <run_depend>std_msgs</run_depend>
   <run_depend>std_srvs</run_depend>
   <run_depend>tf</run_depend>
+
+  <test_depend>rospy</test_depend>
 </package>

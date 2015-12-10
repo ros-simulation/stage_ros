@@ -49,6 +49,8 @@
 #include <geometry_msgs/Twist.h>
 #include <rosgraph_msgs/Clock.h>
 
+#include <geometry_msgs/Pose.h>
+#include "tf/LinearMath/Transform.h"
 #include <std_srvs/Empty.h>
 
 #include "tf/transform_broadcaster.h"
@@ -61,6 +63,7 @@
 #define BASE_SCAN "base_scan"
 #define BASE_POSE_GROUND_TRUTH "base_pose_ground_truth"
 #define CMD_VEL "cmd_vel"
+#define POSE "cmd_pose"
 
 // Our node
 class StageNode
@@ -95,6 +98,7 @@ private:
         std::vector<ros::Publisher> camera_pubs; //multiple cameras
         std::vector<ros::Publisher> laser_pubs; //multiple lasers
 
+        ros::Subscriber pose_sub;
         ros::Subscriber cmdvel_sub; //one cmd_vel subscriber
     };
 
@@ -103,9 +107,9 @@ private:
     // Used to remember initial poses for soft reset
     std::vector<Stg::Pose> initial_poses;
     ros::ServiceServer reset_srv_;
-  
+
     ros::Publisher clock_pub_;
-    
+
     bool isDepthCanonical;
     bool use_model_names;
 
@@ -134,7 +138,7 @@ private:
 
     // Current simulation time
     ros::Time sim_time;
-    
+
     // Last time we saved global position (for velocity calculation).
     ros::Time base_last_globalpos_time;
     // Last published global pose of each robot
@@ -153,13 +157,16 @@ public:
 
     // Our callback
     void WorldCallback();
-    
+
     // Do one update of the world.  May pause if the next update time
     // has not yet arrived.
     bool UpdateWorld();
 
     // Message callback for a MsgBaseVel message, which set velocities.
     void cmdvelReceived(int idx, const boost::shared_ptr<geometry_msgs::Twist const>& msg);
+
+    // Message callback for a MsgBasePose message, which sets positions.
+    void poseReceived(int idx, const boost::shared_ptr<geometry_msgs::Pose const>& msg);
 
     // Service callback for soft reset
     bool cb_reset_srv(std_srvs::Empty::Request& request, std_srvs::Empty::Response& response);
@@ -255,7 +262,6 @@ StageNode::cb_reset_srv(std_srvs::Empty::Request& request, std_srvs::Empty::Resp
 }
 
 
-
 void
 StageNode::cmdvelReceived(int idx, const boost::shared_ptr<geometry_msgs::Twist const>& msg)
 {
@@ -264,6 +270,22 @@ StageNode::cmdvelReceived(int idx, const boost::shared_ptr<geometry_msgs::Twist 
                                         msg->linear.y,
                                         msg->angular.z);
     this->base_last_cmd = this->sim_time;
+}
+
+void
+StageNode::poseReceived(int idx, const boost::shared_ptr<geometry_msgs::Pose const>& msg)
+{
+    boost::mutex::scoped_lock lock(msg_lock);
+    Stg::Pose pose;
+
+    double roll, pitch, yaw;
+    tf::Matrix3x3 m(tf::Quaternion(msg->orientation.x,msg->orientation.y,msg->orientation.z,msg->orientation.w));
+    m.getRPY(roll, pitch, yaw);
+    pose.x = msg->position.x;
+    pose.y = msg->position.y;
+    pose.z = 0;
+    pose.a = yaw;
+    this->positionmodels[idx]->SetPose(pose);
 }
 
 StageNode::StageNode(int argc, char** argv, bool gui, const char* fname, bool use_model_names)
@@ -354,6 +376,7 @@ StageNode::SubscribeModels()
         new_robot->odom_pub = n_.advertise<nav_msgs::Odometry>(mapName(ODOM, r, static_cast<Stg::Model*>(new_robot->positionmodel)), 10);
         new_robot->ground_truth_pub = n_.advertise<nav_msgs::Odometry>(mapName(BASE_POSE_GROUND_TRUTH, r, static_cast<Stg::Model*>(new_robot->positionmodel)), 10);
         new_robot->cmdvel_sub = n_.subscribe<geometry_msgs::Twist>(mapName(CMD_VEL, r, static_cast<Stg::Model*>(new_robot->positionmodel)), 10, boost::bind(&StageNode::cmdvelReceived, this, r, _1));
+        new_robot->pose_sub = n_.subscribe<geometry_msgs::Pose>(mapName(POSE, r, static_cast<Stg::Model*>(new_robot->positionmodel)), 10, boost::bind(&StageNode::poseReceived, this, r, _1));
 
         for (size_t s = 0;  s < new_robot->lasermodels.size(); ++s)
         {
@@ -779,4 +802,3 @@ main(int argc, char** argv)
 
     exit(0);
 }
-
