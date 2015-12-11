@@ -35,3 +35,5 @@ script:
   - catkin build --no-status -vi --no-notify --make-args tests
   # Run tests
   - catkin run_tests
+  # Assert tests all passed
+  - catkin_test_results ./build
