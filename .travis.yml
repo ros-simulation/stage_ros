@@ -1,57 +1,39 @@
-language: cpp
+
+sudo: required
+dist: trusty
+# Force travis to use its minimal image with default Python settings
+language: generic
 compiler:
   - gcc
+env:
+  global:
+    - CATKIN_WS=~/catkin_ws
+    - CATKIN_WS_SRC=${CATKIN_WS}/src
+  matrix:
+    - CI_ROS_DISTRO="indigo"
+    - CI_ROS_DISTRO="jade"
 install:
-  # - if [ $TRAVIS_BRANCH = 'indigo-devel' ]; export CI_ROS_DISTRO=indigo; fi
-  # - if [ $TRAVIS_BRANCH = 'jade-devel' ]; export CI_ROS_DISTRO=jade; fi
-  - export CI_ROS_DISTRO=indigo
-  - echo $CI_ROS_DISTRO
-# Add ROS repositories
-  - sudo sh -c 'echo "deb http://packages.ros.org/ros/ubuntu precise main" > /etc/apt/sources.list.d/ros-latest.list'
+  - sudo sh -c 'echo "deb http://packages.ros.org/ros/ubuntu trusty main" > /etc/apt/sources.list.d/ros-latest.list'
   - wget http://packages.ros.org/ros.key -O - | sudo apt-key add -
-  - sudo apt-get update
-# Install and initialize rosdep
-  - sudo apt-get install python-rosdep python-rosinstall-generator python-wstool
-  - sudo `which rosdep` init
+  - sudo apt-get update -qq
+  - sudo apt-get install -qq -y python-rosdep python-catkin-tools
+  - sudo rosdep init
   - rosdep update
-# Use rosinstall_generator and wstool to get the software (no debs for indigo+)
-  - mkdir deps
-  - cd deps
-  - touch CATKIN_IGNORE
-  - rosinstall_generator --rosdistro $CI_ROS_DISTRO --tar --deps --deps-only stage_ros > deps.rosinstall
-  - wstool init ./src -j10 deps.rosinstall
-# Temporarily get std_srvs until a new version of stage_ros is released
-  - rosinstall_generator --rosdistro $CI_ROS_DISTRO --tar std_srvs > std_srvs.rosinstall
-  - wstool merge -t src std_srvs.rosinstall
-  - wstool up -t src
-# Use rosdep to get the missing dependencies, except console bridge and lz4
-  - rosdep install --default-yes --from-paths ./src --ignore-src --rosdistro $CI_ROS_DISTRO --skip-keys lz4 --skip-keys libconsole-bridge-dev
-# Get lz4
-  - sudo add-apt-repository -y ppa:gezakovacs/lz4
-  - sudo apt-get update
-  - sudo apt-get install -y liblz4-dev
-# Get libconsole-bridge-dev package for precise
-  - mkdir build_console_bridge
-  - cd build_console_bridge
-  - git clone https://github.com/ros/console_bridge.git
-  - cd console_bridge/
-  - mkdir build
-  - cd build/
-  - cmake ..
-  - make
-  - sudo make install
-  - cd ../../..
-# Build the deps
-  - ./src/catkin/bin/catkin_make_isolated --install -j1
-  - cd ..
+  # Use rosdep to install all dependencies (including ROS itself)
+  - rosdep install --from-paths ./ -i -y --rosdistro $CI_ROS_DISTRO
 script:
-  - source deps/install_isolated/setup.bash
-  - mkdir build
-  - cd build
-  - cmake .. -DCMAKE_INSTALL_PREFIX=./install
-  - make -j1
-  - make -j1 run_tests
-  - catkin_test_results .
-  - make -j1 install
-notifications:
-  email: false
+  - source /opt/ros/$CI_ROS_DISTRO/setup.bash
+  - mkdir -p $CATKIN_WS_SRC
+  - ln -s $TRAVIS_BUILD_DIR $CATKIN_WS_SRC
+  - cd $CATKIN_WS
+  - catkin init
+  # Enable install space
+  - catkin config --install
+  # Build [and Install] packages
+  - catkin build --no-status -vi --no-notify -DCMAKE_BUILD_TYPE=Release
+  # Build tests
+  - catkin build --no-status -vi --no-notify --make-args tests
+  # Run tests
+  - catkin run_tests
+  # Assert tests all passed
+  - catkin_test_results ./build
