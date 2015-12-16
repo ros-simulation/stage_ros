@@ -50,6 +50,7 @@
 #include <rosgraph_msgs/Clock.h>
 
 #include <geometry_msgs/Pose.h>
+#include <geometry_msgs/PoseStamped.h>
 #include "tf/LinearMath/Transform.h"
 #include <std_srvs/Empty.h>
 
@@ -64,6 +65,7 @@
 #define BASE_POSE_GROUND_TRUTH "base_pose_ground_truth"
 #define CMD_VEL "cmd_vel"
 #define POSE "cmd_pose"
+#define POSESTAMPED "cmd_pose_stamped"
 
 // Our node
 class StageNode
@@ -98,8 +100,9 @@ private:
         std::vector<ros::Publisher> camera_pubs; //multiple cameras
         std::vector<ros::Publisher> laser_pubs; //multiple lasers
 
-        ros::Subscriber pose_sub;
         ros::Subscriber cmdvel_sub; //one cmd_vel subscriber
+        ros::Subscriber pose_sub;
+        ros::Subscriber posestamped_sub;
     };
 
     std::vector<StageRobot const *> robotmodels_;
@@ -162,11 +165,15 @@ public:
     // has not yet arrived.
     bool UpdateWorld();
 
-    // Message callback for a MsgBaseVel message, which set velocities.
+    // Message callback for a cmd_vel message, which set velocities.
     void cmdvelReceived(int idx, const boost::shared_ptr<geometry_msgs::Twist const>& msg);
 
-    // Message callback for a MsgBasePose message, which sets positions.
+    // Message callback for a cmd_pose message, which sets positions.
     void poseReceived(int idx, const boost::shared_ptr<geometry_msgs::Pose const>& msg);
+
+    // Message callback for a cmd_pose_stamped message, which sets positions
+    // with a timestamp (e.g., from rviz).
+    void poseStampedReceived(int idx, const boost::shared_ptr<geometry_msgs::PoseStamped const>& msg);
 
     // Service callback for soft reset
     bool cb_reset_srv(std_srvs::Empty::Request& request, std_srvs::Empty::Response& response);
@@ -288,6 +295,19 @@ StageNode::poseReceived(int idx, const boost::shared_ptr<geometry_msgs::Pose con
     this->positionmodels[idx]->SetPose(pose);
 }
 
+void
+StageNode::poseStampedReceived(int idx, const boost::shared_ptr<geometry_msgs::PoseStamped const>& msg)
+{
+    // Create a shared pointer to the raw pose and pass it through.
+    // Note that we ignore the header because we're not supporting setting of
+    // poses in an arbitrary frame. Every pose is interpreted to be in Stage's
+    // world frame (which isn't represented anywhere as a tf frame).
+    geometry_msgs::Pose* pose = new geometry_msgs::Pose;
+    *pose = msg->pose;
+    boost::shared_ptr<geometry_msgs::Pose const> pose_ptr(pose);
+    this->poseReceived(idx, pose_ptr);
+}
+
 StageNode::StageNode(int argc, char** argv, bool gui, const char* fname, bool use_model_names)
 {
     this->use_model_names = use_model_names;
@@ -377,6 +397,8 @@ StageNode::SubscribeModels()
         new_robot->ground_truth_pub = n_.advertise<nav_msgs::Odometry>(mapName(BASE_POSE_GROUND_TRUTH, r, static_cast<Stg::Model*>(new_robot->positionmodel)), 10);
         new_robot->cmdvel_sub = n_.subscribe<geometry_msgs::Twist>(mapName(CMD_VEL, r, static_cast<Stg::Model*>(new_robot->positionmodel)), 10, boost::bind(&StageNode::cmdvelReceived, this, r, _1));
         new_robot->pose_sub = n_.subscribe<geometry_msgs::Pose>(mapName(POSE, r, static_cast<Stg::Model*>(new_robot->positionmodel)), 10, boost::bind(&StageNode::poseReceived, this, r, _1));
+
+        new_robot->posestamped_sub = n_.subscribe<geometry_msgs::PoseStamped>(mapName(POSESTAMPED, r, static_cast<Stg::Model*>(new_robot->positionmodel)), 10, boost::bind(&StageNode::poseStampedReceived, this, r, _1));
 
         for (size_t s = 0;  s < new_robot->lasermodels.size(); ++s)
         {

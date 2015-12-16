@@ -38,7 +38,7 @@ import threading
 import time
 import unittest
 
-from geometry_msgs.msg import Pose, Twist
+from geometry_msgs.msg import Pose, PoseStamped, Twist
 from nav_msgs.msg import Odometry
 import rospy
 import rostest
@@ -156,6 +156,42 @@ class TestStageRos(unittest.TestCase):
         bpgt = self.base_pose_ground_truth
         self.assertAlmostEqual(bpgt.pose.pose.position.x, pose.position.x)
         self.assertAlmostEqual(bpgt.pose.pose.position.y, pose.position.y)
+        self.assertEqual(bpgt.pose.pose.position.z, 0.0)
+        q = [bpgt.pose.pose.orientation.x,
+             bpgt.pose.pose.orientation.y,
+             bpgt.pose.pose.orientation.z,
+             bpgt.pose.pose.orientation.w]
+        e = tf.transformations.euler_from_quaternion(q)
+        self.assertEqual(e[0], 0.0)
+        self.assertEqual(e[1], 0.0)
+        self.assertAlmostEqual(e[2], yaw)
+
+    # Test that, if we command the robot to jump to a pose (with a header), it does so.
+    def test_pose_stamped(self):
+        pub = rospy.Publisher('cmd_pose_stamped', PoseStamped, queue_size=1)
+        while pub.get_num_connections() == 0:
+            time.sleep(0.1)
+        ps = PoseStamped()
+        ps.header.frame_id = 'ignored_value'
+        ps.header.stamp = rospy.Time.now()
+        ps.pose.position.x = -42.0
+        ps.pose.position.y = 42.0
+        ps.pose.position.z = -142.0
+        roll = -0.2
+        pitch = 0.3
+        yaw = -0.9
+        q = tf.transformations.quaternion_from_euler(roll, pitch, yaw)
+        ps.pose.orientation.x = q[0]
+        ps.pose.orientation.y = q[1]
+        ps.pose.orientation.z = q[2]
+        ps.pose.orientation.w = q[3]
+        pub.publish(ps)
+        time.sleep(3.0)
+        # Now we expect the robot's ground truth pose to be what we told, except
+        # for z, roll, and pitch, which should all be zero (Stage is 2-D, after all).
+        bpgt = self.base_pose_ground_truth
+        self.assertAlmostEqual(bpgt.pose.pose.position.x, ps.pose.position.x)
+        self.assertAlmostEqual(bpgt.pose.pose.position.y, ps.pose.position.y)
         self.assertEqual(bpgt.pose.pose.position.z, 0.0)
         q = [bpgt.pose.pose.orientation.x,
              bpgt.pose.pose.orientation.y,
