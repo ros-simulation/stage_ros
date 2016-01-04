@@ -457,7 +457,7 @@ StageNode::WorldCallback()
                 for(unsigned int i = 0; i < sensor.ranges.size(); i++)
                 {
                     msg.ranges[i] = sensor.ranges[i];
-                    msg.intensities[i] = (uint8_t)sensor.intensities[i];
+                    msg.intensities[i] = sensor.intensities[i];
                 }
 
                 if (robotmodel->lasermodels.size() > 1)
