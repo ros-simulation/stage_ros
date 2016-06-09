@@ -45,7 +45,7 @@
 #include <sensor_msgs/Image.h>
 #include <sensor_msgs/image_encodings.h>
 #include <sensor_msgs/CameraInfo.h>
-#include <sensor_msgs/MarkerDetection.h>
+#include <stage_ros/MarkerDetection.h>
 #include <nav_msgs/Odometry.h>
 #include <geometry_msgs/Twist.h>
 #include <rosgraph_msgs/Clock.h>
@@ -406,9 +406,9 @@ StageNode::SubscribeModels()
         for (size_t s = 0;  s < new_robot->fiducialmodels.size(); ++s)
         {
             if (new_robot->fiducialmodels.size() == 1)
-                new_robot->fiducial_pubs.push_back(n_.advertise<sensor_msgs::MarkerDetection>(mapName(BASE_FIDUCIAL_DETECTION, r, static_cast<Stg::Model*>(new_robot->positionmodel)), 10));
+                new_robot->fiducial_pubs.push_back(n_.advertise<stage_ros::MarkerDetection>(mapName(BASE_FIDUCIAL_DETECTION, r, static_cast<Stg::Model*>(new_robot->positionmodel)), 10));
             else
-                new_robot->fiducial_pubs.push_back(n_.advertise<sensor_msgs::MarkerDetection>(mapName(BASE_FIDUCIAL_DETECTION, r, s, static_cast<Stg::Model*>(new_robot->positionmodel)), 10));
+                new_robot->fiducial_pubs.push_back(n_.advertise<stage_ros::MarkerDetection>(mapName(BASE_FIDUCIAL_DETECTION, r, s, static_cast<Stg::Model*>(new_robot->positionmodel)), 10));
         }
 
         this->robotmodels_.push_back(new_robot);
@@ -524,7 +524,7 @@ StageNode::WorldCallback()
             const std::vector<Stg::ModelFiducial::Fiducial>& fiducials = fiducialmodel->GetFiducials();
 
             // Translate into ROS message format and publish
-            sensor_msgs::MarkerDetection msg;
+            stage_ros::MarkerDetection msg;
             msg.angle_horizontal_min = -fiducialmodel->fov/2.0;
             msg.angle_horizontal_max = +fiducialmodel->fov/2.0;
             msg.distance_min = fiducialmodel->min_range;
