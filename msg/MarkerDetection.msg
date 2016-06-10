@@ -9,5 +9,4 @@ geometry_msgs/Quaternion view_direction       # view direction
 float32 fov_horizontal                        # field of view horizontal [rad]
 float32 fov_vertical                          # field of view vertical [rad]
 
-# depending on the detection system markers poses can be deliverd with a pose covariance 
-MarkerWithCovariance[] markers # detected markers
+Marker[] markers               # detected markers
