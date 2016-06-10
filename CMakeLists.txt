@@ -10,7 +10,6 @@ find_package(catkin REQUIRED
     std_msgs
     std_srvs
     tf
-    message_generation
 )
 
 find_package(Boost REQUIRED COMPONENTS system thread)
@@ -23,23 +22,8 @@ include_directories(
   ${STAGE_INCLUDE_DIRS}
 )
 
-  
-add_message_files(
-  DIRECTORY msg
-  FILES
-  Marker.msg
-  MarkerDetection.msg
-  Marker.msg
-  MarkerStamped.msg
-  MarkerWithCovariance.msg
-  MarkerWithCovarianceStamped.msg
-  Markers.msg)
-  
-generate_messages(DEPENDENCIES geometry_msgs std_msgs)
+catkin_package()
 
-catkin_package(
-  CATKIN_DEPENDS geometry_msgs message_runtime std_msgs)
-  
 # Declare a cpp executable
 add_executable(stageros src/stageros.cpp)
 set(${PROJECT_NAME}_extra_libs "")
