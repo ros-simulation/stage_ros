@@ -525,8 +525,12 @@ StageNode::WorldCallback()
 
             // Translate into ROS message format and publish
             sensor_msgs::MarkerDetection msg;
-            msg.angle_horizontal_min = -fiducialmodel->fov/2.0;
-            msg.angle_horizontal_max = +fiducialmodel->fov/2.0;
+	    msg.view_direction.x = 0;
+	    msg.view_direction.y = 0;
+	    msg.view_direction.z = 0;
+	    msg.view_direction.w = 1;
+            msg.fov_horizontal = fiducialmodel->fov;
+            msg.fov_vertical = 0;
             msg.distance_min = fiducialmodel->min_range;
             msg.distance_max = fiducialmodel->max_range_anon;
             msg.distance_max_id = fiducialmodel->max_range_id;
