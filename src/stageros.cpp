@@ -546,14 +546,13 @@ StageNode::WorldCallback()
 
             for(unsigned int i = 0; i < fiducials.size(); i++)
             {
-                msg.markers[i].marker.id = fiducials[i].id;
+                msg.markers[i].id = fiducials[i].id;
 
-                msg.markers[i].marker.pose.position.x = fiducials[i].range * cos(fiducials[i].bearing);
-                msg.markers[i].marker.pose.position.y = fiducials[i].range * sin(fiducials[i].bearing);
-                msg.markers[i].marker.pose.position.z = 0;
-		for(size_t j = 0; j < 36; j++)  msg.markers[i].covariance[j] = 0;
+                msg.markers[i].pose.position.x = fiducials[i].range * cos(fiducials[i].bearing);
+                msg.markers[i].pose.position.y = fiducials[i].range * sin(fiducials[i].bearing);
+                msg.markers[i].pose.position.z = 0;
 
-                msg.markers[i].marker.pose.orientation = tf::createQuaternionMsgFromYaw(fiducials[i].geom.a);
+                msg.markers[i].pose.orientation = tf::createQuaternionMsgFromYaw(fiducials[i].geom.a);
             }
 
             if (robotmodel->fiducialmodels.size() > 1)
