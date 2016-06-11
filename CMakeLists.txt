@@ -7,6 +7,7 @@ find_package(catkin REQUIRED
     nav_msgs
     roscpp
     sensor_msgs
+    marker_msgs
     std_msgs
     std_srvs
     tf
