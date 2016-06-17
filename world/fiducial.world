@@ -88,21 +88,42 @@ qrcode
 )
 qrcode
 (
-  pose [  3 -3 0 0 ]
+  pose [  3 -3 0 80 ]
   fiducial_return 3
+)
+qrcode
+(
+  pose [ -3 -3 0 0 ]
+  fiducial_return 4
+)
+qrcode
+(
+  pose [  6  0 0 20 ]
+  fiducial_return 5
+)
+qrcode
+(
+  pose [  0  6 0 0 ]
+  fiducial_return 6
+)
+qrcode
+(
+  pose [ -6  0 0 30 ]
+  fiducial_return 7
+)
+qrcode
+(
+  pose [  0 -6 0 0 ]
+  fiducial_return 8
 )
 
 pioneer2dx_no_sonar 
 (
   name "robot_0"
-  color "red"
 
-  # pose [ -3 -3 0 45 ]
-  # pose [ 0 -2 0 0 ]
+  color "red"
   pose [ 0 -5 0 0 ]
-  # pose [ 0 -8 0 0 ]
+
   hokuyolaser(pose [ 0.225 0.000 -0.15 0.0 ])
-  # hokuyolaser(pose [ 0.17 0.1705 -0.15 41.0 ])
   qrcodereader(pose [ 0.225 0.0 -0.15 0.0 ])
-  # qrcodereader(pose [ 0.17 0.1705 -0.15 41.0 ])
 )
