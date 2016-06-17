@@ -65,7 +65,7 @@
 #define BASE_FIDUCIAL_LINK "base_fiducial_link"
 #define BASE_FOOTPRINT "base_footprint"
 #define BASE_SCAN "base_scan"
-#define BASE_FIDUCIAL_DETECTION "base_fiducial_detection"
+#define BASE_MARKER_DETECTION "base_marker_detection"
 #define BASE_POSE_GROUND_TRUTH "base_pose_ground_truth"
 #define CMD_VEL "cmd_vel"
 
@@ -406,9 +406,9 @@ StageNode::SubscribeModels()
         for (size_t s = 0;  s < new_robot->fiducialmodels.size(); ++s)
         {
             if (new_robot->fiducialmodels.size() == 1)
-                new_robot->fiducial_pubs.push_back(n_.advertise<marker_msgs::MarkerDetection>(mapName(BASE_FIDUCIAL_DETECTION, r, static_cast<Stg::Model*>(new_robot->positionmodel)), 10));
+                new_robot->fiducial_pubs.push_back(n_.advertise<marker_msgs::MarkerDetection>(mapName(BASE_MARKER_DETECTION, r, static_cast<Stg::Model*>(new_robot->positionmodel)), 10));
             else
-                new_robot->fiducial_pubs.push_back(n_.advertise<marker_msgs::MarkerDetection>(mapName(BASE_FIDUCIAL_DETECTION, r, s, static_cast<Stg::Model*>(new_robot->positionmodel)), 10));
+                new_robot->fiducial_pubs.push_back(n_.advertise<marker_msgs::MarkerDetection>(mapName(BASE_MARKER_DETECTION, r, s, static_cast<Stg::Model*>(new_robot->positionmodel)), 10));
         }
 
         this->robotmodels_.push_back(new_robot);
@@ -525,28 +525,26 @@ StageNode::WorldCallback()
 
             // Translate into ROS message format and publish
             marker_msgs::MarkerDetection msg;
-	    msg.view_direction.x = 0;
-	    msg.view_direction.y = 0;
-	    msg.view_direction.z = 0;
-	    msg.view_direction.w = 1;
+            msg.view_direction.x = 0;
+            msg.view_direction.y = 0;
+            msg.view_direction.z = 0;
+            msg.view_direction.w = 1;
             msg.fov_horizontal = fiducialmodel->fov;
             msg.fov_vertical = 0;
             msg.distance_min = fiducialmodel->min_range;
             msg.distance_max = fiducialmodel->max_range_anon;
             msg.distance_max_id = fiducialmodel->max_range_id;
-	    /** 
-            msg.sigma_radial = 0;
-            msg.sigma_polar = 0;
-            msg.sigma_azimuthal = 0;
-            msg.sigma_roll = 0;
-            msg.sigma_pitch = 0;
-            msg.sigma_yaw = 0;
-	    */
             msg.markers.resize(fiducials.size());
 
             for(unsigned int i = 0; i < fiducials.size(); i++)
             {
-                msg.markers[i].id = fiducials[i].id;
+                if (fiducials[i].id != 0)
+                {
+                    msg.markers[i].ids.resize(1);
+                    msg.markers[i].ids_confidence.resize(1);
+                    msg.markers[i].ids[0] = fiducials[i].id;
+                    msg.markers[i].ids_confidence[0] = 1;
+                }
 
                 msg.markers[i].pose.position.x = fiducials[i].range * cos(fiducials[i].bearing);
                 msg.markers[i].pose.position.y = fiducials[i].range * sin(fiducials[i].bearing);
