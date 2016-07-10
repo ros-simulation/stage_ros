@@ -44,6 +44,8 @@ endif()
 
 install(PROGRAMS scripts/upgrade-world.sh
   DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION})
+install(PROGRAMS scripts/rosparam_instantiate.py
+  DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION})
 
 install(TARGETS stageros
   ARCHIVE DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
