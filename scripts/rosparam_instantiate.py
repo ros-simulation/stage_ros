@@ -13,6 +13,7 @@ def instantiate_rosparams(world_str_in, rosparam_objs):
 			obj_str = obj_props['model_type'] + '\n(\n'
 			obj_str += '    name "%s"\n' % str(obj_name)
 			for prop, val in obj_props.items():
+				if str(prop) == 'model_type': continue
 				obj_str += '    %s ' % str(prop)
 				if isinstance(val, int) or isinstance(val, float):
 					obj_str += str(val)
