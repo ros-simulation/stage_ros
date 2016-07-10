@@ -143,7 +143,7 @@ private:
 public:
     // Constructor; stage itself needs argc/argv.  fname is the .world file
     // that stage should load.
-    StageNode(int argc, char** argv, bool gui, const char* fname, bool use_model_names);
+    StageNode(int argc, char** argv, bool gui, const char* fname, bool use_model_names, const char* compute_cmd);
     ~StageNode();
 
     // Subscribe to models of interest.  Currently, we find and subscribe
@@ -266,7 +266,7 @@ StageNode::cmdvelReceived(int idx, const boost::shared_ptr<geometry_msgs::Twist 
     this->base_last_cmd = this->sim_time;
 }
 
-StageNode::StageNode(int argc, char** argv, bool gui, const char* fname, bool use_model_names)
+StageNode::StageNode(int argc, char** argv, bool gui, const char* fname, bool use_model_names, const char* compute_cmd)
 {
     this->use_model_names = use_model_names;
     this->sim_time.fromSec(0.0);
@@ -280,6 +280,8 @@ StageNode::StageNode(int argc, char** argv, bool gui, const char* fname, bool us
     if(!localn.getParam("is_depth_canonical", isDepthCanonical))
         isDepthCanonical = true;
 
+    if(strcmp(compute_cmd, ""))
+        system(compute_cmd);
 
     // We'll check the existence of the world file, because libstage doesn't
     // expose its failure to open it.  Could go further with checks (e.g., is
@@ -744,15 +746,28 @@ main(int argc, char** argv)
 
     bool gui = true;
     bool use_model_names = false;
-    for(int i=0;i<(argc-1);i++)
+    int i;
+    for(i=0;i<(argc-1);i++)
     {
         if(!strcmp(argv[i], "-g"))
             gui = false;
         if(!strcmp(argv[i], "-u"))
             use_model_names = true;
+        if(!strcmp(argv[i], "-c"))
+            break; // all further args are passed to the -c command
     }
 
-    StageNode sn(argc-1,argv,gui,argv[argc-1], use_model_names);
+    std::stringstream ss;
+    if(i+1 < argc-1)
+    {
+        for(i+=1; i<(argc-1); ++i)
+            ss << argv[i] << " ";
+        ss << argv[argc-1]; // expected worldfile passed as last arg
+    }
+    std::string s = ss.str();
+    const char* compute_cmd = s.c_str();
+
+    StageNode sn(argc-1,argv,gui,argv[argc-1], use_model_names, compute_cmd);
 
     if(sn.SubscribeModels() != 0)
         exit(-1);
