@@ -534,6 +534,7 @@ StageNode::WorldCallback()
             msg.distance_min = fiducialmodel->min_range;
             msg.distance_max = fiducialmodel->max_range_anon;
             msg.distance_max_id = fiducialmodel->max_range_id;
+            msg.type = std::string("stage");
             msg.markers.resize(fiducials.size());
 
             for(unsigned int i = 0; i < fiducials.size(); i++)
