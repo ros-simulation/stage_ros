@@ -470,7 +470,7 @@ StageNode::WorldCallback()
                 msg.angle_max = +sensor.fov/2.0;
                 msg.angle_increment = sensor.fov/(double)(sensor.sample_count-1);
                 msg.range_min = sensor.range.min;
-                msg.range_max = sensor.range.max;
+                msg.range_max = sensor.range.max - 0.1;
                 msg.ranges.resize(sensor.ranges.size());
                 msg.intensities.resize(sensor.intensities.size());
 
