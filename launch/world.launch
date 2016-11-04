@@ -1,5 +1,5 @@
 <launch>
-  <arg name="world" default="cave" />
+  <arg name="world" default="cave" /> <!-- cave, cave_multi, fiducial, ... -->
 
   <!-- loads the stage simulation -->
   <node name="stage_ros" pkg="stage_ros" type="stageros" args="$(find stage_ros)/world/$(arg world).world"/>
