@@ -48,6 +48,7 @@
 #include <nav_msgs/Odometry.h>
 #include <geometry_msgs/Twist.h>
 #include <rosgraph_msgs/Clock.h>
+#include <geometry_msgs/Pose2D.h>
 
 #include <std_srvs/Empty.h>
 
@@ -61,6 +62,7 @@
 #define BASE_SCAN "base_scan"
 #define BASE_POSE_GROUND_TRUTH "base_pose_ground_truth"
 #define CMD_VEL "cmd_vel"
+#define POSE "pose"
 
 // Our node
 class StageNode
@@ -96,6 +98,7 @@ private:
         std::vector<ros::Publisher> laser_pubs; //multiple lasers
 
         ros::Subscriber cmdvel_sub; //one cmd_vel subscriber
+        ros::Subscriber pose_sub; //one pos subscriber
     };
 
     std::vector<StageRobot const *> robotmodels_;
@@ -160,6 +163,9 @@ public:
 
     // Message callback for a MsgBaseVel message, which set velocities.
     void cmdvelReceived(int idx, const boost::shared_ptr<geometry_msgs::Twist const>& msg);
+
+    // Message callback for a Pose2D message, which sets pose.
+    void poseReceived(int idx, const boost::shared_ptr<geometry_msgs::Pose2D const>& msg);
 
     // Service callback for soft reset
     bool cb_reset_srv(std_srvs::Empty::Request& request, std_srvs::Empty::Response& response);
@@ -266,6 +272,18 @@ StageNode::cmdvelReceived(int idx, const boost::shared_ptr<geometry_msgs::Twist 
     this->base_last_cmd = this->sim_time;
 }
 
+void
+StageNode::poseReceived(int idx, const boost::shared_ptr<geometry_msgs::Pose2D const>& msg)
+{
+  boost::mutex::scoped_lock lock(msg_lock);
+  Stg::Pose pose;
+  pose.x = msg->x;
+  pose.y = msg->y;
+  pose.z =0;
+  pose.a = msg->theta;
+  this->positionmodels[idx]->SetPose(pose);
+}
+
 StageNode::StageNode(int argc, char** argv, bool gui, const char* fname, bool use_model_names)
 {
     this->use_model_names = use_model_names;
@@ -354,6 +372,7 @@ StageNode::SubscribeModels()
         new_robot->odom_pub = n_.advertise<nav_msgs::Odometry>(mapName(ODOM, r, static_cast<Stg::Model*>(new_robot->positionmodel)), 10);
         new_robot->ground_truth_pub = n_.advertise<nav_msgs::Odometry>(mapName(BASE_POSE_GROUND_TRUTH, r, static_cast<Stg::Model*>(new_robot->positionmodel)), 10);
         new_robot->cmdvel_sub = n_.subscribe<geometry_msgs::Twist>(mapName(CMD_VEL, r, static_cast<Stg::Model*>(new_robot->positionmodel)), 10, boost::bind(&StageNode::cmdvelReceived, this, r, _1));
+        new_robot->pose_sub = n_.subscribe<geometry_msgs::Pose2D>(mapName(POSE, r, static_cast<Stg::Model*>(new_robot->positionmodel)), 10, boost::bind(&StageNode::poseReceived, this, r, _1));
 
         for (size_t s = 0;  s < new_robot->lasermodels.size(); ++s)
         {
@@ -734,6 +753,8 @@ StageNode::WorldCallback()
 int 
 main(int argc, char** argv)
 { 
+    ROS_INFO_STREAM("Custom stage_ros by MAK.");
+
     if( argc < 2 )
     {
         puts(USAGE);
