@@ -57,24 +57,6 @@ define pioneer2dx_no_sonar pioneer2dx_base_no_sonar
   )
 )
 
-define hokuyolaser ranger
-(
-  sensor
-  (       
-    # laser-specific properties
-    # factory settings for LMS200  
-    range [ 0.0  5.0 ]
-    fov 270.0
-    samples 270
-  )
-  model
-  (
-    # generic model properties
-    size [ 0.07 0.07 0.05 ] # dimensions from LMS200 data sheet  
-    color "blue"
-  )
-)
-
 define qrcodereader fiducial
 (
   fiducial_key 1 # fiducial_key values of model and fiducial detector must match
