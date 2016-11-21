@@ -103,7 +103,7 @@ private:
         std::vector<ros::Publisher> depth_pubs; //multiple depths
         std::vector<ros::Publisher> camera_pubs; //multiple cameras
         std::vector<ros::Publisher> laser_pubs; //multiple lasers
-        std::vector<ros::Publisher> fiducial_pubs; //multiple lasers
+        std::vector<ros::Publisher> fiducial_pubs; //multiple fiducials
 
         ros::Subscriber cmdvel_sub; //one cmd_vel subscriber
     };
