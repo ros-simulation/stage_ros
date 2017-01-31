@@ -11,6 +11,7 @@ find_package(catkin REQUIRED
     std_msgs
     std_srvs
     tf
+    dynamic_reconfigure
 )
 
 find_package(Boost REQUIRED COMPONENTS system thread)
@@ -21,6 +22,11 @@ include_directories(
   ${catkin_INCLUDE_DIRS}
   ${Boost_INCLUDE_DIRS}
   ${STAGE_INCLUDE_DIRS}
+)
+
+## Generate dynamic reconfigure parameters in the 'cfg' folder
+generate_dynamic_reconfigure_options(
+  cfg/StageRos.cfg
 )
 
 catkin_package()

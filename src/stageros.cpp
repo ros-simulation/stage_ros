@@ -54,6 +54,9 @@
 
 #include "tf/transform_broadcaster.h"
 
+#include <dynamic_reconfigure/server.h>
+#include <stage_ros/StageRosConfig.h>
+
 #define USAGE "stageros <worldfile>"
 #define IMAGE "image"
 #define DEPTH "depth"
@@ -68,6 +71,9 @@
 #define BASE_MARKER_DETECTION "base_marker_detection"
 #define BASE_POSE_GROUND_TRUTH "base_pose_ground_truth"
 #define CMD_VEL "cmd_vel"
+
+
+
 
 // Our node
 class StageNode
@@ -86,6 +92,11 @@ private:
     std::vector<Stg::ModelFiducial *> fiducialmodels;
     std::vector<Stg::ModelPosition *> positionmodels;
 
+    struct VelocityCmdsDiffDrive {
+	double v;
+	double w;  
+    };
+    
     //a structure representing a robot inthe simulator
     struct StageRobot
     {
@@ -106,6 +117,8 @@ private:
         std::vector<ros::Publisher> fiducial_pubs; //multiple fiducials
 
         ros::Subscriber cmdvel_sub; //one cmd_vel subscriber
+        
+        VelocityCmdsDiffDrive cmdsDes;
     };
 
     std::vector<StageRobot const *> robotmodels_;
@@ -149,6 +162,12 @@ private:
     ros::Time base_last_globalpos_time;
     // Last published global pose of each robot
     std::vector<Stg::Pose> base_last_globalpos;
+    
+    // ROS Dynamic reconfigure
+    void callbackConfig ( stage_ros::StageRosConfig &_config, uint32_t _level ); ///< callback function on incoming parameter changes
+    dynamic_reconfigure::Server<stage_ros::StageRosConfig>* reconfigureServer_; ///< parameter server stuff
+    dynamic_reconfigure::Server<stage_ros::StageRosConfig>::CallbackType reconfigureFnc_;///< parameter server stuff
+    stage_ros::StageRosConfig config_;
 
 public:
     // Constructor; stage itself needs argc/argv.  fname is the .world file
@@ -171,6 +190,8 @@ public:
 
     // Message callback for a MsgBaseVel message, which set velocities.
     void cmdvelReceived(int idx, const boost::shared_ptr<geometry_msgs::Twist const>& msg);
+    
+    void cmdvelReceivedConstrainedDiffDrive(int idx, const boost::shared_ptr<geometry_msgs::Twist const>& msg);
 
     // Service callback for soft reset
     bool cb_reset_srv(std_srvs::Empty::Request& request, std_srvs::Empty::Response& response);
@@ -268,10 +289,18 @@ StageNode::cb_reset_srv(std_srvs::Empty::Request& request, std_srvs::Empty::Resp
 }
 
 
+void
+StageNode::cmdvelReceivedConstrainedDiffDrive(int idx, const boost::shared_ptr<geometry_msgs::Twist const>& msg)
+{   
+    boost::mutex::scoped_lock lock(msg_lock);
+    const_cast<StageRobot*>(this->robotmodels_[idx])->cmdsDes.v = msg->linear.x;
+    const_cast<StageRobot*>(this->robotmodels_[idx])->cmdsDes.w = msg->angular.z;
+    this->base_last_cmd = this->sim_time;
+}
 
 void
 StageNode::cmdvelReceived(int idx, const boost::shared_ptr<geometry_msgs::Twist const>& msg)
-{
+{   
     boost::mutex::scoped_lock lock(msg_lock);
     this->positionmodels[idx]->SetSpeed(msg->linear.x,
                                         msg->linear.y,
@@ -376,7 +405,11 @@ StageNode::SubscribeModels()
 
         new_robot->odom_pub = n_.advertise<nav_msgs::Odometry>(mapName(ODOM, r, static_cast<Stg::Model*>(new_robot->positionmodel)), 10);
         new_robot->ground_truth_pub = n_.advertise<nav_msgs::Odometry>(mapName(BASE_POSE_GROUND_TRUTH, r, static_cast<Stg::Model*>(new_robot->positionmodel)), 10);
-        new_robot->cmdvel_sub = n_.subscribe<geometry_msgs::Twist>(mapName(CMD_VEL, r, static_cast<Stg::Model*>(new_robot->positionmodel)), 10, boost::bind(&StageNode::cmdvelReceived, this, r, _1));
+	if(!config_.constrainedDiffDrive) {
+	    new_robot->cmdvel_sub = n_.subscribe<geometry_msgs::Twist>(mapName(CMD_VEL, r, static_cast<Stg::Model*>(new_robot->positionmodel)), 10, boost::bind(&StageNode::cmdvelReceived, this, r, _1));
+	} else {
+	    new_robot->cmdvel_sub = n_.subscribe<geometry_msgs::Twist>(mapName(CMD_VEL, r, static_cast<Stg::Model*>(new_robot->positionmodel)), 10, boost::bind(&StageNode::cmdvelReceivedConstrainedDiffDrive, this, r, _1));
+	}
 
         for (size_t s = 0;  s < new_robot->lasermodels.size(); ++s)
         {
@@ -417,12 +450,35 @@ StageNode::SubscribeModels()
 
     // advertising reset service
     reset_srv_ = n_.advertiseService("reset_positions", &StageNode::cb_reset_srv, this);
+    
+    
+    reconfigureServer_ = new dynamic_reconfigure::Server<stage_ros::StageRosConfig> ( ros::NodeHandle ( "~" ) );
+    reconfigureFnc_ = boost::bind ( &StageNode::callbackConfig, this,  _1, _2 );
+    reconfigureServer_->setCallback ( reconfigureFnc_ );
 
     return(0);
 }
 
+void StageNode::callbackConfig ( stage_ros::StageRosConfig& _config, uint32_t _level ) {
+    config_ = _config;
+    
+    if(!config_.constrainedDiffDrive) {
+	for(size_t i = 0; i < robotmodels_.size(); ++i) {
+	    StageNode::StageRobot* robotModelsI = const_cast<StageNode::StageRobot*>(robotmodels_[i]);
+	    robotModelsI->cmdvel_sub = n_.subscribe<geometry_msgs::Twist>(mapName(CMD_VEL, i, static_cast<Stg::Model*>(robotModelsI->positionmodel)), 10, boost::bind(&StageNode::cmdvelReceived, this, i, _1));
+	}
+    } else {
+	for(size_t i = 0; i < robotmodels_.size(); ++i) {
+	    StageNode::StageRobot* robotModelsI = const_cast<StageNode::StageRobot*>(robotmodels_[i]);
+	    robotModelsI->cmdvel_sub = n_.subscribe<geometry_msgs::Twist>(mapName(CMD_VEL, i, static_cast<Stg::Model*>(robotModelsI->positionmodel)), 10, boost::bind(&StageNode::cmdvelReceivedConstrainedDiffDrive, this, i, _1));
+	}
+    }
+}
+
+
 StageNode::~StageNode()
 {    
+    delete reconfigureServer_;
     for (std::vector<StageRobot const*>::iterator r = this->robotmodels_.begin(); r != this->robotmodels_.end(); ++r)
         delete *r;
 }
@@ -437,6 +493,52 @@ void
 StageNode::WorldCallback()
 {
     boost::mutex::scoped_lock lock(msg_lock);
+    static double tOld = world->SimTimeNow() / 1e6;
+    const double tNow = world->SimTimeNow() / 1e6;
+    const double dt = tNow - tOld;
+    tOld = tNow;
+    if(config_.constrainedDiffDrive) {
+	
+	for(size_t i = 0; i < robotmodels_.size(); ++i) {
+	    StageRobot* robModelsI = const_cast<StageRobot*>(robotmodels_[i]);
+	    double vPrev = positionmodels[i]->GetVelocity().x;
+	    double wPrev = positionmodels[i]->GetVelocity().a;
+	    double v = robModelsI->cmdsDes.v;
+	    double w = robModelsI->cmdsDes.w;
+	    
+	    const double vWRPrev = vPrev + wPrev * config_.diffDrive_dWheels / (2.);
+	    const double vWLPrev = vPrev - wPrev * config_.diffDrive_dWheels / (2.);
+	    
+	    double vWR = v + w * config_.diffDrive_dWheels / (2.);
+	    double vWL = v - w * config_.diffDrive_dWheels / (2.);
+	    
+	    const double signVWR = vWR >= 0 ? 1 : -1;
+	    const double signVWL = vWL >= 0 ? 1 : -1;
+	    
+	    vWR = signVWR * fmin(fabs(vWR), config_.diffDrive_VWheelMax);
+	    vWL = signVWL * fmin(fabs(vWL), config_.diffDrive_VWheelMax);
+	    
+	    double avWR = (vWR - vWRPrev) / dt;
+	    double avWL = (vWL - vWLPrev) / dt;
+	    
+	    const double signAVWR = avWR >= 0 ? 1 : -1;
+	    const double signAVWL = avWL >= 0 ? 1 : -1;
+	    
+	    avWR = signAVWR * fmin(fabs(avWR), config_.diffDrive_AVWheelMax);
+	    avWL = signAVWL * fmin(fabs(avWL), config_.diffDrive_AVWheelMax);
+	    
+	    vWR = fmax(fmin(vWR, vWRPrev + fabs(avWR) * dt), vWRPrev - fabs(avWR) * dt);
+	    vWL = fmax(fmin(vWL, vWLPrev + fabs(avWL) * dt), vWLPrev - fabs(avWL) * dt);
+	    
+	    const double vAns = (vWR + vWL) / 2.;
+	    const double wAns = (vWR - vWL) / config_.diffDrive_dWheels;
+	    
+	    
+	    this->positionmodels[i]->SetSpeed(vAns, 0, wAns);
+	}
+    }
+    
+    
 
     this->sim_time.fromSec(world->SimTimeNow() / 1e6);
     // We're not allowed to publish clock==0, because it used as a special
@@ -451,8 +553,16 @@ StageNode::WorldCallback()
     if((this->base_watchdog_timeout.toSec() > 0.0) &&
             ((this->sim_time - this->base_last_cmd) >= this->base_watchdog_timeout))
     {
-        for (size_t r = 0; r < this->positionmodels.size(); r++)
-            this->positionmodels[r]->SetSpeed(0.0, 0.0, 0.0);
+	if(config_.constrainedDiffDrive) {
+	    for (size_t r = 0; r < this->positionmodels.size(); r++) {
+		StageRobot* robModelsI = const_cast<StageRobot*>(robotmodels_[r]);
+		robModelsI->cmdsDes.v = 0;
+		robModelsI->cmdsDes.w = 0;
+	    }
+	} else {
+	    for (size_t r = 0; r < this->positionmodels.size(); r++)
+		this->positionmodels[r]->SetSpeed(0.0, 0.0, 0.0);
+	}
     }
 
     //loop on the robot models
