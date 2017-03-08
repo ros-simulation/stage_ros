@@ -47,7 +47,6 @@ floorplan
   pose [0 0 0 0]
   bitmap "bitmaps/line.png"
 )
-# set the resolution of
 
 # define a block
 define my_block model

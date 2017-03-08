@@ -1,5 +1,5 @@
-# cave-pionee.world 
-# simple cave environment with a pioneer robot based on the basic world file examples of 
+# cave_multi.world
+# simple cave environment with multiple pioneer robots based on the basic world file examples of 
 # Richard Vaughan Richard Vaughan, Andrew Howard, Luis Riazuelo
 # Authors: Markus Bader
 
@@ -49,7 +49,6 @@ floorplan
   pose [0 0 0 0]
   bitmap "bitmaps/cave.png"
 )
-# set the resolution of
 
 # define a block
 define my_block model
@@ -58,9 +57,10 @@ define my_block model
   gui_nose 0
 )
 
-# throw in a robot
+# throw in a block
 my_block( pose [ 5 4 0 180.000 ] color "green")
 
+# throw in some robots
 pioneer2dx_no_sonar 
 (
   # can refer to the robot by this name

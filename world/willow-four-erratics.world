@@ -6,10 +6,10 @@ define block model
 
 define topurg ranger
 (
-	sensor( 			
+  sensor(
     range [ 0.0  30.0 ]
     fov 270.25
-   samples 1081
+    samples 1081
   )
 
   # generic model properties
@@ -67,7 +67,7 @@ floorplan
   pose [ -29.350 27.000 0 90.000 ]
 )
 
-# throw in two robots
+# throw in four robots
 erratic( pose [ -11.277 23.266 0 180.000 ] name "era" color "blue")
 erratic( pose [ -13.277 22.266 0 180.000 ] name "era2" color "blue")
 erratic( pose [ -13.277 23.266 0 180.000 ] name "era3" color "blue")
