@@ -1,7 +1,7 @@
 <?xml version="1.0"?>
 <package>
   <name>stage_ros</name>
-  <version>1.7.5</version>
+  <version>1.8.0</version>
   <description>This package provides ROS specific hooks for stage</description>
 
   <maintainer email="william@osrfoundation.org">William Woodall</maintainer>

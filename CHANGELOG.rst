@@ -2,6 +2,14 @@
 Changelog for package stage_ros
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+1.8.0 (2017-04-30)
+------------------
+* Now uses Stage's native event loop properly and added reassuring startup output.
+* Added a GUI section so that the world starts in a good place.
+* Fixed issue such that ranger intensity values are no longer clipped to 256
+  See: `#31 <https://github.com/ros-simulation/stage_ros/issues/31>`_
+* Contributors: Richard Vaughan, Shane Loretz, William Woodall, gerkey
+
 1.7.5 (2015-09-16)
 ------------------
 * Removed all references to FLTK/Fluid and use the upstream CMake config file instead.
