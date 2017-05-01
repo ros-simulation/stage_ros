@@ -109,6 +109,7 @@ private:
     
     bool isDepthCanonical;
     bool use_model_names;
+    bool use_robot_description_tf;
 
     // A helper function that is executed for each stage model.  We use it
     // to search for models of interest.
@@ -285,6 +286,8 @@ StageNode::StageNode(int argc, char** argv, bool gui, const char* fname, bool us
     if(!localn.getParam("is_depth_canonical", isDepthCanonical))
         isDepthCanonical = true;
 
+    localn.param("use_robot_description_tf", use_robot_description_tf, false);
+  
     // We'll check the existence of the world file, because libstage doesn't
     // expose its failure to open it.  Could go further with checks (e.g., is
     // it readable by this user).
@@ -491,21 +494,25 @@ StageNode::WorldCallback()
             laserQ.setRPY(0.0, 0.0, lp.a);
             tf::Transform txLaser =  tf::Transform(laserQ, tf::Point(lp.x, lp.y, robotmodel->positionmodel->GetGeom().size.z + lp.z));
 
-            if (robotmodel->lasermodels.size() > 1)
-                tf.sendTransform(tf::StampedTransform(txLaser, sim_time,
-                                                      mapName("base_link", r, static_cast<Stg::Model*>(robotmodel->positionmodel)),
-                                                      mapName("base_laser_link", r, s, static_cast<Stg::Model*>(robotmodel->positionmodel))));
-            else
-                tf.sendTransform(tf::StampedTransform(txLaser, sim_time,
-                                                      mapName("base_link", r, static_cast<Stg::Model*>(robotmodel->positionmodel)),
-                                                      mapName("base_laser_link", r, static_cast<Stg::Model*>(robotmodel->positionmodel))));
+            if (!this->use_robot_description_tf) {
+                if (robotmodel->lasermodels.size() > 1)
+                    tf.sendTransform(tf::StampedTransform(txLaser, sim_time,
+                                                          mapName("base_link", r, static_cast<Stg::Model*>(robotmodel->positionmodel)),
+                                                          mapName("base_laser_link", r, s, static_cast<Stg::Model*>(robotmodel->positionmodel))));
+                else
+                    tf.sendTransform(tf::StampedTransform(txLaser, sim_time,
+                                                          mapName("base_link", r, static_cast<Stg::Model*>(robotmodel->positionmodel)),
+                                                          mapName("base_laser_link", r, static_cast<Stg::Model*>(robotmodel->positionmodel))));
+            }
         }
 
         //the position of the robot
-        tf.sendTransform(tf::StampedTransform(tf::Transform::getIdentity(),
-                                              sim_time,
-                                              mapName("base_footprint", r, static_cast<Stg::Model*>(robotmodel->positionmodel)),
-                                              mapName("base_link", r, static_cast<Stg::Model*>(robotmodel->positionmodel))));
+        if (!this->use_robot_description_tf) {
+            tf.sendTransform(tf::StampedTransform(tf::Transform::getIdentity(),
+                                                  sim_time,
+                                                  mapName("base_footprint", r, static_cast<Stg::Model*>(robotmodel->positionmodel)),
+                                                  mapName("base_link", r, static_cast<Stg::Model*>(robotmodel->positionmodel))));
+        }
 
         // Get latest odometry data
         // Translate into ROS message format and publish
@@ -684,14 +691,16 @@ StageNode::WorldCallback()
 
                 tf::Transform tr =  tf::Transform(Q, tf::Point(lp.x, lp.y, robotmodel->positionmodel->GetGeom().size.z+lp.z));
 
-                if (robotmodel->cameramodels.size() > 1)
-                    tf.sendTransform(tf::StampedTransform(tr, sim_time,
-                                                          mapName("base_link", r, static_cast<Stg::Model*>(robotmodel->positionmodel)),
-                                                          mapName("camera", r, s, static_cast<Stg::Model*>(robotmodel->positionmodel))));
-                else
-                    tf.sendTransform(tf::StampedTransform(tr, sim_time,
-                                                          mapName("base_link", r, static_cast<Stg::Model*>(robotmodel->positionmodel)),
-                                                          mapName("camera", r, static_cast<Stg::Model*>(robotmodel->positionmodel))));
+                if (!this->use_robot_description_tf) {
+                    if (robotmodel->cameramodels.size() > 1)
+                        tf.sendTransform(tf::StampedTransform(tr, sim_time,
+                                                              mapName("base_link", r, static_cast<Stg::Model*>(robotmodel->positionmodel)),
+                                                              mapName("camera", r, s, static_cast<Stg::Model*>(robotmodel->positionmodel))));
+                    else
+                        tf.sendTransform(tf::StampedTransform(tr, sim_time,
+                                                              mapName("base_link", r, static_cast<Stg::Model*>(robotmodel->positionmodel)),
+                                                              mapName("camera", r, static_cast<Stg::Model*>(robotmodel->positionmodel))));
+                }
 
                 sensor_msgs::CameraInfo camera_msg;
                 if (robotmodel->cameramodels.size() > 1)
