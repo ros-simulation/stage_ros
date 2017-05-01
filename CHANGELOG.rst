@@ -2,8 +2,8 @@
 Changelog for package stage_ros
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-Forthcoming
------------
+1.8.0 (2017-04-30)
+------------------
 * Now uses Stage's native event loop properly and added reassuring startup output.
 * Added a GUI section so that the world starts in a good place.
 * Fixed issue such that ranger intensity values are no longer clipped to 256
