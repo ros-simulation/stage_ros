@@ -62,43 +62,48 @@ floorplan( )
 
 qrcode
 (
-  pose [  3  3 0 20 ]
+  pose [  5  5 0 0 ]
   fiducial_return 1
 )
 qrcode
 (
-  pose [ -3  3 0 0 ]
+  pose [ 0  7 0 0 ]
   fiducial_return 2
 )
 qrcode
 (
-  pose [  3 -3 0 80 ]
+  pose [ -5  5 0 0 ]
   fiducial_return 3
 )
 qrcode
 (
-  pose [ -3 -3 0 0 ]
+  pose [ -7 0 0 0 ]
   fiducial_return 4
 )
 qrcode
 (
-  pose [  6  0 0 20 ]
+  pose [  -5  -5 0 0 ]
   fiducial_return 5
 )
 qrcode
 (
-  pose [  0  6 0 0 ]
+  pose [  0 -7 0 0 ]
   fiducial_return 6
 )
 qrcode
 (
-  pose [ -6  0 0 30 ]
+  pose [ 5  -5 0 0 ]
   fiducial_return 7
 )
 qrcode
 (
-  pose [  0 -6 0 0 ]
+  pose [  -3 -0 0 0 ]
   fiducial_return 8
+)
+qrcode
+(
+  pose [  0 3 0 0 ]
+  fiducial_return 9
 )
 
 pioneer2dx_no_sonar 
@@ -106,7 +111,7 @@ pioneer2dx_no_sonar
   name "robot_0"
 
   color "red"
-  pose [ 0 -5 0 0 ]
+  pose [ -7 -7 0 45 ] 
 
   hokuyolaser(pose [ 0.225 0.000 -0.15 0.0 ])
   qrcodereader(pose [ 0.225 0.0 -0.15 0.0 ])
