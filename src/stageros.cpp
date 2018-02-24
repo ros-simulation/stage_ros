@@ -43,6 +43,7 @@
 #include <boost/thread/mutex.hpp>
 #include <boost/thread/thread.hpp>
 #include <sensor_msgs/LaserScan.h>
+#include <sensor_msgs/Range.h>
 #include <sensor_msgs/Image.h>
 #include <sensor_msgs/image_encodings.h>
 #include <sensor_msgs/CameraInfo.h>
@@ -60,6 +61,7 @@
 #define CAMERA_INFO "camera_info"
 #define ODOM "odom"
 #define BASE_SCAN "base_scan"
+#define SONAR "sonar"  // want naming "sonar_x/range, so concatenate "range" in later naming
 #define BASE_POSE_GROUND_TRUTH "base_pose_ground_truth"
 #define CMD_VEL "cmd_vel"
 
@@ -76,8 +78,10 @@ private:
 
     // The models that we're interested in
     std::vector<Stg::ModelCamera *> cameramodels;
-    std::vector<Stg::ModelRanger *> lasermodels;
+    std::vector<Stg::ModelRanger *> rangermodels;
     std::vector<Stg::ModelPosition *> positionmodels;
+    std::vector<Stg::ModelRanger *> lasermodels;
+    std::vector<Stg::ModelRanger *> sonarmodels;
 
     //a structure representing a robot inthe simulator
     struct StageRobot
@@ -85,7 +89,9 @@ private:
         //stage related models
         Stg::ModelPosition* positionmodel; //one position
         std::vector<Stg::ModelCamera *> cameramodels; //multiple cameras per position
-        std::vector<Stg::ModelRanger *> lasermodels; //multiple rangers per position
+        std::vector<Stg::ModelRanger *> rangermodels; //multiple rangers per position, contains lasers and sonars
+        std::vector<Stg::ModelRanger *> lasermodels; // multiple lasers per position
+        std::vector<Stg::ModelRanger *> sonarmodels; // multiple sonars per position
 
         //ros publishers
         ros::Publisher odom_pub; //one odom
@@ -95,6 +101,7 @@ private:
         std::vector<ros::Publisher> depth_pubs; //multiple depths
         std::vector<ros::Publisher> camera_pubs; //multiple cameras
         std::vector<ros::Publisher> laser_pubs; //multiple lasers
+        std::vector<ros::Publisher> sonar_pubs; // multiple sonars
 
         ros::Subscriber cmdvel_sub; //one cmd_vel subscriber
     };
@@ -364,6 +371,44 @@ StageNode::SubscribeModels()
         new_robot->ground_truth_pub = n_.advertise<nav_msgs::Odometry>(mapName(BASE_POSE_GROUND_TRUTH, r, static_cast<Stg::Model*>(new_robot->positionmodel)), 10);
         new_robot->cmdvel_sub = n_.subscribe<geometry_msgs::Twist>(mapName(CMD_VEL, r, static_cast<Stg::Model*>(new_robot->positionmodel)), 10, boost::bind(&StageNode::cmdvelReceived, this, r, _1));
 
+        // break rangermodes -> lasermdoels + sonarmodels
+        int num_lasers = 0;
+        int num_sonars = 0;
+        for (size_t s = 0; s < new_robot->rangermodels.size(); s++)
+        {
+          // assumed only one sensor per ranger, as Stage currently only supports this
+          // sonar is sample_count == 1
+          if (rangermodels[s]->GetSensors()[0].sample_count == 1)
+          {
+            new_robot->sonarmodels.push_back(rangermodels[s]);
+            num_sonars++;
+          }
+          else
+          {
+            new_robot->lasermodels.push_back(rangermodels[s]);
+            num_lasers++;
+          }
+        }
+
+        // create publishers for lasers and sonars with correct labelling
+        // add number label on each topic with more than one device
+        if (num_lasers == 1)
+          new_robot->laser_pubs.push_back(n_.advertise<sensor_msgs::LaserScan>(mapName(BASE_SCAN, r, static_cast<Stg::Model*>(new_robot->positionmodel)), 10));
+        else
+        {
+          for (size_t s = 0; s < num_lasers; ++s)
+            new_robot->laser_pubs.push_back(n_.advertise<sensor_msgs::LaserScan>(mapName(BASE_SCAN, r, s, static_cast<Stg::Model*>(new_robot->positionmodel)), 10));
+        }    
+
+        // add "/range" at end of name to get naming style "sonar_3/range"
+        if (num_sonars == 1)
+          new_robot->sonar_pubs.push_back(n_.advertise<sensor_msgs::Range>(std::string(mapName(SONAR, r, static_cast<Stg::Model*>(new_robot->positionmodel))) + "/range", 10));
+        else
+        {
+          for (size_t s = 0; s < num_sonars; ++s)
+            new_robot->sonar_pubs.push_back(n_.advertise<sensor_msgs::Range>(std::string(mapName(SONAR, r, s, static_cast<Stg::Model*>(new_robot->positionmodel))) + "/range", 10));
+        }
+
         for (size_t s = 0;  s < new_robot->lasermodels.size(); ++s)
         {
             if (new_robot->lasermodels.size() == 1)
@@ -444,14 +489,14 @@ StageNode::WorldCallback()
     {
         StageRobot const * robotmodel = this->robotmodels_[r];
 
-        //loop on the laser devices for the current robot
+        // loop on the laser devices for the current robot
         for (size_t s = 0; s < robotmodel->lasermodels.size(); ++s)
         {
             Stg::ModelRanger const* lasermodel = robotmodel->lasermodels[s];
             const std::vector<Stg::ModelRanger::Sensor>& sensors = lasermodel->GetSensors();
 
             if( sensors.size() > 1 )
-                ROS_WARN( "ROS Stage currently supports rangers with 1 sensor only." );
+                ROS_WARN_ONCE( "ROS Stage currently supports rangers with 1 sensor only." );
 
             // for now we access only the zeroth sensor of the ranger - good
             // enough for most laser models that have a single beam origin
@@ -499,6 +544,57 @@ StageNode::WorldCallback()
                 tf.sendTransform(tf::StampedTransform(txLaser, sim_time,
                                                       mapName("base_link", r, static_cast<Stg::Model*>(robotmodel->positionmodel)),
                                                       mapName("base_laser_link", r, static_cast<Stg::Model*>(robotmodel->positionmodel))));
+        }
+
+        // loop on the sonar devices for the current robot
+        for (size_t s = 0; s < robotmodel->sonarmodels.size(); ++s)
+        {
+            Stg::ModelRanger const* sonarmodel = robotmodel->sonarmodels[s];
+            const std::vector<Stg::ModelRanger::Sensor>& sensors = sonarmodel->GetSensors(); 
+
+            if (sensors.size() > 1)
+                ROS_WARN("ROS Stage currently supports sonars with 1 sensor only.");  
+
+            // for now we access only the zeroth sensor of the sonar - good
+            // enough for most sonar models that have a single beam origin
+            const Stg::ModelRanger::Sensor& sensor = sensors[0];  
+
+            if (sensor.ranges.size())
+            {
+                // Translate into ROS message format and publish
+                sensor_msgs::Range msg;
+                msg.field_of_view = sensor.fov;
+                msg.min_range = sensor.range.min;
+                msg.max_range = sensor.range.max;
+                msg.range = sensor.ranges[0];   
+
+                // assume all are sonar, not infrared. This choice not currently in Stage
+                msg.radiation_type = sensor_msgs::Range::ULTRASOUND;
+
+                if (robotmodel->sonarmodels.size() > 1)
+                    msg.header.frame_id = mapName("base_sonar_link", r, s, static_cast<Stg::Model*>(robotmodel->positionmodel));
+                else
+                    msg.header.frame_id = mapName("base_sonar_link", r, static_cast<Stg::Model*>(robotmodel->positionmodel));    
+
+                msg.header.stamp = sim_time;
+                robotmodel->sonar_pubs[s].publish(msg);
+            }  
+
+            // Also publish the base->sonar_link Tx.  This could eventually move
+            // into being retrieved from the param server as a static Tx.
+            Stg::Pose lp = sonarmodel->GetPose();
+            tf::Quaternion sonarQ;
+            sonarQ.setRPY(0.0, 0.0, lp.a);
+            tf::Transform txSonar =  tf::Transform(sonarQ, tf::Point(lp.x, lp.y, robotmodel->positionmodel->GetGeom().size.z + lp.z));  
+
+            if (robotmodel->sonarmodels.size() > 1)
+                tf.sendTransform(tf::StampedTransform(txSonar, sim_time,
+                                                    mapName("base_link", r, static_cast<Stg::Model*>(robotmodel->positionmodel)),
+                                                    mapName("base_sonar_link", r, s, static_cast<Stg::Model*>(robotmodel->positionmodel))));
+            else
+                tf.sendTransform(tf::StampedTransform(txSonar, sim_time,
+                                                    mapName("base_link", r, static_cast<Stg::Model*>(robotmodel->positionmodel)),
+                                                    mapName("base_sonar_link", r, static_cast<Stg::Model*>(robotmodel->positionmodel))));
         }
 
         //the position of the robot
