@@ -1,5 +1,5 @@
 <?xml version="1.0"?>
-<package>
+<package format="2">
   <name>stage_ros</name>
   <version>1.8.0</version>
   <description>This package provides ROS specific hooks for stage</description>
@@ -15,25 +15,15 @@
   <author email="gerky@osrfoundation.org">Brian Gerky</author>
 
   <buildtool_depend>catkin</buildtool_depend>
-
-  <build_depend>boost</build_depend>
-  <build_depend>geometry_msgs</build_depend>
-  <build_depend>nav_msgs</build_depend>
-  <build_depend>roscpp</build_depend>
   <build_depend>rostest</build_depend>
-  <build_depend>sensor_msgs</build_depend>
-  <build_depend>stage</build_depend>
-  <build_depend>std_msgs</build_depend>
-  <build_depend>std_srvs</build_depend>
-  <build_depend>tf</build_depend>
 
-  <run_depend>boost</run_depend>
-  <run_depend>geometry_msgs</run_depend>
-  <run_depend>nav_msgs</run_depend>
-  <run_depend>roscpp</run_depend>
-  <run_depend>sensor_msgs</run_depend>
-  <run_depend>stage</run_depend>
-  <run_depend>std_msgs</run_depend>
-  <run_depend>std_srvs</run_depend>
-  <run_depend>tf</run_depend>
+  <depend>boost</depend>
+  <depend>geometry_msgs</depend>
+  <depend>nav_msgs</depend>
+  <depend>roscpp</depend>
+  <depend>sensor_msgs</depend>
+  <depend>stage</depend>
+  <depend>std_msgs</depend>
+  <depend>std_srvs</depend>
+  <depend>tf</depend>
 </package>
