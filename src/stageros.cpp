@@ -27,16 +27,16 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <string>
+#include <vector>
 
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <unistd.h>
 #include <signal.h>
 
-
 // libstage
 #include <stage.hh>
-
 
 // roscpp
 #include <ros/ros.h>
@@ -67,7 +67,6 @@
 class StageNode
 {
 private:
-
   // roscpp-related bookkeeping
   ros::NodeHandle n_;
 
@@ -79,24 +78,24 @@ private:
   std::vector<Stg::ModelRanger *> lasermodels;
   std::vector<Stg::ModelPosition *> positionmodels;
 
-  //a structure representing a robot inthe simulator
+  // a structure representing a robot inthe simulator
   struct StageRobot
   {
-    //stage related models
-    Stg::ModelPosition* positionmodel; //one position
-    std::vector<Stg::ModelCamera *> cameramodels; //multiple cameras per position
-    std::vector<Stg::ModelRanger *> lasermodels; //multiple rangers per position
+    // stage related models
+    Stg::ModelPosition* positionmodel;  // one position
+    std::vector<Stg::ModelCamera *> cameramodels;  // multiple cameras per position
+    std::vector<Stg::ModelRanger *> lasermodels;  // multiple rangers per position
 
-    //ros publishers
-    ros::Publisher odom_pub; //one odom
-    ros::Publisher ground_truth_pub; //one ground truth
+    // ros publishers
+    ros::Publisher odom_pub;  // one odom
+    ros::Publisher ground_truth_pub;  // one ground truth
 
-    std::vector<ros::Publisher> image_pubs; //multiple images
-    std::vector<ros::Publisher> depth_pubs; //multiple depths
-    std::vector<ros::Publisher> camera_pubs; //multiple cameras
-    std::vector<ros::Publisher> laser_pubs; //multiple lasers
+    std::vector<ros::Publisher> image_pubs;  // multiple images
+    std::vector<ros::Publisher> depth_pubs;  // multiple depths
+    std::vector<ros::Publisher> camera_pubs;  // multiple cameras
+    std::vector<ros::Publisher> laser_pubs;  // multiple lasers
 
-    ros::Subscriber cmdvel_sub; //one cmd_vel subscriber
+    ros::Subscriber cmdvel_sub;  // one cmd_vel subscriber
   };
 
   std::vector<StageRobot const *> robotmodels_;
@@ -174,7 +173,7 @@ public:
 const char *
 StageNode::mapName(const char *name, size_t robotID, Stg::Model* mod) const
 {
-  //ROS_INFO("Robot %lu: Device %s", robotID, name);
+  // ROS_INFO("Robot %lu: Device %s", robotID, name);
   bool umn = this->use_model_names;
 
   if ((positionmodels.size() > 1) || umn)
@@ -201,7 +200,7 @@ StageNode::mapName(const char *name, size_t robotID, Stg::Model* mod) const
 const char *
 StageNode::mapName(const char *name, size_t robotID, size_t deviceID, Stg::Model* mod) const
 {
-  //ROS_INFO("Robot %lu: Device %s:%lu", robotID, name, deviceID);
+  // ROS_INFO("Robot %lu: Device %s:%lu", robotID, name, deviceID);
   bool umn = this->use_model_names;
 
   if ((positionmodels.size() > 1) || umn)
@@ -231,7 +230,7 @@ StageNode::mapName(const char *name, size_t robotID, size_t deviceID, Stg::Model
 void
 StageNode::ghfunc(Stg::Model* mod, StageNode* node)
 {
-  //printf( "inspecting %s, parent\n", mod->Token() );
+  // printf( "inspecting %s, parent\n", mod->Token() );
 
   if (dynamic_cast<Stg::ModelRanger *>(mod))
   {
@@ -306,7 +305,7 @@ StageNode::StageNode(int argc, char** argv, bool gui, const char* fname, bool us
 
   this->world->Load(fname);
 
-  // todo: reverse the order of these next lines? try it .
+  // add: reverse the order of these next lines? try it .
 
   this->world->AddUpdateCallback((Stg::world_callback_t)s_update, this);
 
@@ -338,7 +337,7 @@ StageNode::SubscribeModels()
     // subscribe rangers
     for (size_t s = 0; s < this->lasermodels.size(); s++)
     {
-      if (this->lasermodels[s] and this->lasermodels[s]->Parent() == new_robot->positionmodel)
+      if (this->lasermodels[s] && this->lasermodels[s]->Parent() == new_robot->positionmodel)
       {
         new_robot->lasermodels.push_back(this->lasermodels[s]);
         this->lasermodels[s]->Subscribe();
@@ -349,7 +348,7 @@ StageNode::SubscribeModels()
     // subscribe cameras
     for (size_t s = 0; s < this->cameramodels.size(); s++)
     {
-      if (this->cameramodels[s] and this->cameramodels[s]->Parent() == new_robot->positionmodel)
+      if (this->cameramodels[s] && this->cameramodels[s]->Parent() == new_robot->positionmodel)
       {
         new_robot->cameramodels.push_back(this->cameramodels[s]);
         this->cameramodels[s]->Subscribe();
@@ -358,25 +357,29 @@ StageNode::SubscribeModels()
       }
     }
 
-    // TODO - print the topic names nicely as well
+    // ADD print the topic names nicely as well
     ROS_INFO("Robot %s provided %lu rangers and %lu cameras",
              new_robot->positionmodel->Token(),
              new_robot->lasermodels.size(),
              new_robot->cameramodels.size());
 
     // create odom, ground_truth and cmd_vel publishers
-    new_robot->odom_pub = n_.advertise<nav_msgs::Odometry>(mapName(ODOM, r, static_cast<Stg::Model*>(new_robot->positionmodel)), 10);
-    new_robot->ground_truth_pub = n_.advertise<nav_msgs::Odometry>(mapName(BASE_POSE_GROUND_TRUTH, r, static_cast<Stg::Model*>(new_robot->positionmodel)), 10);
-    new_robot->cmdvel_sub = n_.subscribe<geometry_msgs::Twist>(mapName(CMD_VEL, r, static_cast<Stg::Model*>(new_robot->positionmodel)), 10, boost::bind(&StageNode::cmdvelReceived, this, r, _1));
+    new_robot->odom_pub = n_.advertise<nav_msgs::Odometry>(mapName(ODOM, r,
+      static_cast<Stg::Model*>(new_robot->positionmodel)), 10);
+    new_robot->ground_truth_pub = n_.advertise<nav_msgs::Odometry>(mapName(BASE_POSE_GROUND_TRUTH, r,
+      static_cast<Stg::Model*>(new_robot->positionmodel)), 10);
+    new_robot->cmdvel_sub = n_.subscribe<geometry_msgs::Twist>(mapName(CMD_VEL, r,
+      static_cast<Stg::Model*>(new_robot->positionmodel)), 10, boost::bind(&StageNode::cmdvelReceived, this, r, _1));
 
     // create laser publishers
     for (size_t s = 0;  s < new_robot->lasermodels.size(); ++s)
     {
       if (new_robot->lasermodels.size() == 1)
-        new_robot->laser_pubs.push_back(n_.advertise<sensor_msgs::LaserScan>(mapName(BASE_SCAN, r, static_cast<Stg::Model*>(new_robot->positionmodel)), 10));
+        new_robot->laser_pubs.push_back(n_.advertise<sensor_msgs::LaserScan>(mapName(BASE_SCAN, r,
+          static_cast<Stg::Model*>(new_robot->positionmodel)), 10));
       else
-        new_robot->laser_pubs.push_back(n_.advertise<sensor_msgs::LaserScan>(mapName(BASE_SCAN, r, s, static_cast<Stg::Model*>(new_robot->positionmodel)), 10));
-
+        new_robot->laser_pubs.push_back(n_.advertise<sensor_msgs::LaserScan>(mapName(BASE_SCAN, r, s,
+          static_cast<Stg::Model*>(new_robot->positionmodel)), 10));
     }
 
     // create camera publishers
@@ -384,15 +387,21 @@ StageNode::SubscribeModels()
     {
       if (new_robot->cameramodels.size() == 1)
       {
-        new_robot->image_pubs.push_back(n_.advertise<sensor_msgs::Image>(mapName(IMAGE, r, static_cast<Stg::Model*>(new_robot->positionmodel)), 10));
-        new_robot->depth_pubs.push_back(n_.advertise<sensor_msgs::Image>(mapName(DEPTH, r, static_cast<Stg::Model*>(new_robot->positionmodel)), 10));
-        new_robot->camera_pubs.push_back(n_.advertise<sensor_msgs::CameraInfo>(mapName(CAMERA_INFO, r, static_cast<Stg::Model*>(new_robot->positionmodel)), 10));
+        new_robot->image_pubs.push_back(n_.advertise<sensor_msgs::Image>(mapName(IMAGE, r,
+          static_cast<Stg::Model*>(new_robot->positionmodel)), 10));
+        new_robot->depth_pubs.push_back(n_.advertise<sensor_msgs::Image>(mapName(DEPTH, r,
+          static_cast<Stg::Model*>(new_robot->positionmodel)), 10));
+        new_robot->camera_pubs.push_back(n_.advertise<sensor_msgs::CameraInfo>(mapName(CAMERA_INFO, r,
+          static_cast<Stg::Model*>(new_robot->positionmodel)), 10));
       }
       else
       {
-        new_robot->image_pubs.push_back(n_.advertise<sensor_msgs::Image>(mapName(IMAGE, r, s, static_cast<Stg::Model*>(new_robot->positionmodel)), 10));
-        new_robot->depth_pubs.push_back(n_.advertise<sensor_msgs::Image>(mapName(DEPTH, r, s, static_cast<Stg::Model*>(new_robot->positionmodel)), 10));
-        new_robot->camera_pubs.push_back(n_.advertise<sensor_msgs::CameraInfo>(mapName(CAMERA_INFO, r, s, static_cast<Stg::Model*>(new_robot->positionmodel)), 10));
+        new_robot->image_pubs.push_back(n_.advertise<sensor_msgs::Image>(mapName(IMAGE, r, s,
+          static_cast<Stg::Model*>(new_robot->positionmodel)), 10));
+        new_robot->depth_pubs.push_back(n_.advertise<sensor_msgs::Image>(mapName(DEPTH, r, s,
+          static_cast<Stg::Model*>(new_robot->positionmodel)), 10));
+        new_robot->camera_pubs.push_back(n_.advertise<sensor_msgs::CameraInfo>(mapName(CAMERA_INFO, r, s,
+          static_cast<Stg::Model*>(new_robot->positionmodel)), 10));
       }
     }
     this->robotmodels_.push_back(new_robot);
@@ -420,7 +429,7 @@ StageNode::UpdateWorld()
 void
 StageNode::WorldCallback()
 {
-  if (! ros::ok())
+  if (!ros::ok())
   {
     ROS_INFO("ros::ok() is false. Quitting.");
     this->world->QuitAll();
@@ -438,7 +447,7 @@ StageNode::WorldCallback()
     return;
   }
 
-  // TODO make this only affect one robot if necessary
+  // add: make this only affect one robot if necessary
   if ((this->base_watchdog_timeout.toSec() > 0.0) &&
       ((this->sim_time - this->base_last_cmd) >= this->base_watchdog_timeout))
   {
@@ -446,12 +455,12 @@ StageNode::WorldCallback()
       this->positionmodels[r]->SetSpeed(0.0, 0.0, 0.0);
   }
 
-  //loop on the robot models
+  // loop on the robot models
   for (size_t r = 0; r < this->robotmodels_.size(); ++r)
   {
     StageRobot const * robotmodel = this->robotmodels_[r];
 
-    //loop on the laser devices for the current robot
+    // loop on the laser devices for the current robot
     for (size_t s = 0; s < robotmodel->lasermodels.size(); ++s)
     {
       Stg::ModelRanger const* lasermodel = robotmodel->lasermodels[s];
@@ -470,7 +479,7 @@ StageNode::WorldCallback()
         sensor_msgs::LaserScan msg;
         msg.angle_min = -sensor.fov / 2.0;
         msg.angle_max = +sensor.fov / 2.0;
-        msg.angle_increment = sensor.fov / (double)(sensor.sample_count - 1);
+        msg.angle_increment = sensor.fov / static_cast<double>(sensor.sample_count - 1);
         msg.range_min = sensor.range.min;
         msg.range_max = sensor.range.max;
         msg.ranges.resize(sensor.ranges.size());
@@ -483,9 +492,11 @@ StageNode::WorldCallback()
         }
 
         if (robotmodel->lasermodels.size() > 1)
-          msg.header.frame_id = mapName("base_laser_link", r, s, static_cast<Stg::Model*>(robotmodel->positionmodel));
+          msg.header.frame_id = mapName("base_laser_link", r, s,
+            static_cast<Stg::Model*>(robotmodel->positionmodel));
         else
-          msg.header.frame_id = mapName("base_laser_link", r, static_cast<Stg::Model*>(robotmodel->positionmodel));
+          msg.header.frame_id = mapName("base_laser_link", r,
+            static_cast<Stg::Model*>(robotmodel->positionmodel));
 
         msg.header.stamp = sim_time;
         robotmodel->laser_pubs[s].publish(msg);
@@ -496,23 +507,30 @@ StageNode::WorldCallback()
       Stg::Pose lp = lasermodel->GetPose();
       tf::Quaternion laserQ;
       laserQ.setRPY(0.0, 0.0, lp.a);
-      tf::Transform txLaser =  tf::Transform(laserQ, tf::Point(lp.x, lp.y, robotmodel->positionmodel->GetGeom().size.z + lp.z));
+      tf::Transform txLaser =  tf::Transform(laserQ, tf::Point(lp.x, lp.y,
+        robotmodel->positionmodel->GetGeom().size.z + lp.z));
 
       if (robotmodel->lasermodels.size() > 1)
         tf.sendTransform(tf::StampedTransform(txLaser, sim_time,
-                                              mapName("base_link", r, static_cast<Stg::Model*>(robotmodel->positionmodel)),
-                                              mapName("base_laser_link", r, s, static_cast<Stg::Model*>(robotmodel->positionmodel))));
+                                              mapName("base_link", r,
+                                                static_cast<Stg::Model*>(robotmodel->positionmodel)),
+                                              mapName("base_laser_link", r, s,
+                                                static_cast<Stg::Model*>(robotmodel->positionmodel))));
       else
         tf.sendTransform(tf::StampedTransform(txLaser, sim_time,
-                                              mapName("base_link", r, static_cast<Stg::Model*>(robotmodel->positionmodel)),
-                                              mapName("base_laser_link", r, static_cast<Stg::Model*>(robotmodel->positionmodel))));
+                                              mapName("base_link", r,
+                                                static_cast<Stg::Model*>(robotmodel->positionmodel)),
+                                              mapName("base_laser_link", r,
+                                                static_cast<Stg::Model*>(robotmodel->positionmodel))));
     }
 
-    //the position of the robot
+    // the position of the robot
     tf.sendTransform(tf::StampedTransform(tf::Transform::getIdentity(),
                                           sim_time,
-                                          mapName("base_footprint", r, static_cast<Stg::Model*>(robotmodel->positionmodel)),
-                                          mapName("base_link", r, static_cast<Stg::Model*>(robotmodel->positionmodel))));
+                                          mapName("base_footprint", r,
+                                            static_cast<Stg::Model*>(robotmodel->positionmodel)),
+                                          mapName("base_link", r,
+                                            static_cast<Stg::Model*>(robotmodel->positionmodel))));
 
     // Get latest odometry data
     // Translate into ROS message format and publish
@@ -525,10 +543,11 @@ StageNode::WorldCallback()
     odom_msg.twist.twist.linear.y = v.y;
     odom_msg.twist.twist.angular.z = v.a;
 
-    //@todo Publish stall on a separate topic when one becomes available
-    //this->odomMsgs[r].stall = this->positionmodels[r]->Stall();
+    // @add: Publish stall on a separate topic when one becomes available
+    // this->odomMsgs[r].stall = this->positionmodels[r]->Stall();
     //
-    odom_msg.header.frame_id = mapName("odom", r, static_cast<Stg::Model*>(robotmodel->positionmodel));
+    odom_msg.header.frame_id = mapName("odom", r,
+      static_cast<Stg::Model*>(robotmodel->positionmodel));
     odom_msg.header.stamp = sim_time;
 
     robotmodel->odom_pub.publish(odom_msg);
@@ -538,8 +557,10 @@ StageNode::WorldCallback()
     tf::quaternionMsgToTF(odom_msg.pose.pose.orientation, odomQ);
     tf::Transform txOdom(odomQ, tf::Point(odom_msg.pose.pose.position.x, odom_msg.pose.pose.position.y, 0.0));
     tf.sendTransform(tf::StampedTransform(txOdom, sim_time,
-                                          mapName("odom", r, static_cast<Stg::Model*>(robotmodel->positionmodel)),
-                                          mapName("base_footprint", r, static_cast<Stg::Model*>(robotmodel->positionmodel))));
+                                          mapName("odom", r,
+                                            static_cast<Stg::Model*>(robotmodel->positionmodel)),
+                                          mapName("base_footprint", r,
+                                            static_cast<Stg::Model*>(robotmodel->positionmodel))));
 
     // Also publish the ground truth pose and velocity
     Stg::Pose gpose = robotmodel->positionmodel->GetGlobalPose();
@@ -557,11 +578,10 @@ StageNode::WorldCallback()
                  (gpose.x - prevpose.x) / dT,
                  (gpose.y - prevpose.y) / dT,
                  (gpose.z - prevpose.z) / dT,
-                 Stg::normalize(gpose.a - prevpose.a) / dT
-               );
+                 Stg::normalize(gpose.a - prevpose.a) / dT);
       this->base_last_globalpos.at(r) = gpose;
     }
-    else  //There are no previous readings, adding current pose...
+    else  // There are no previous readings, adding current pose...
       this->base_last_globalpos.push_back(gpose);
 
     nav_msgs::Odometry ground_truth_msg;
@@ -577,12 +597,13 @@ StageNode::WorldCallback()
     ground_truth_msg.twist.twist.linear.z = gvel.z;
     ground_truth_msg.twist.twist.angular.z = gvel.a;
 
-    ground_truth_msg.header.frame_id = mapName("odom", r, static_cast<Stg::Model*>(robotmodel->positionmodel));
+    ground_truth_msg.header.frame_id = mapName("odom", r,
+      static_cast<Stg::Model*>(robotmodel->positionmodel));
     ground_truth_msg.header.stamp = sim_time;
 
     robotmodel->ground_truth_pub.publish(ground_truth_msg);
 
-    //cameras
+    // cameras
     for (size_t s = 0; s < robotmodel->cameramodels.size(); ++s)
     {
       Stg::ModelCamera* cameramodel = robotmodel->cameramodels[s];
@@ -595,13 +616,13 @@ StageNode::WorldCallback()
         image_msg.height = cameramodel->getHeight();
         image_msg.width = cameramodel->getWidth();
         image_msg.encoding = "rgba8";
-        //this->imageMsgs[r].is_bigendian="";
+        // this->imageMsgs[r].is_bigendian="";
         image_msg.step = image_msg.width * 4;
         image_msg.data.resize(image_msg.width * image_msg.height * 4);
 
         memcpy(&(image_msg.data[0]), cameramodel->FrameColor(), image_msg.width * image_msg.height * 4);
 
-        //invert the opengl weirdness
+        // invert the opengl weirdness
         int height = image_msg.height - 1;
         int linewidth = image_msg.width * 4;
 
@@ -614,36 +635,40 @@ StageNode::WorldCallback()
         }
 
         if (robotmodel->cameramodels.size() > 1)
-          image_msg.header.frame_id = mapName("camera", r, s, static_cast<Stg::Model*>(robotmodel->positionmodel));
+          image_msg.header.frame_id = mapName("camera", r, s,
+            static_cast<Stg::Model*>(robotmodel->positionmodel));
         else
-          image_msg.header.frame_id = mapName("camera", r, static_cast<Stg::Model*>(robotmodel->positionmodel));
+          image_msg.header.frame_id = mapName("camera", r,
+            static_cast<Stg::Model*>(robotmodel->positionmodel));
         image_msg.header.stamp = sim_time;
 
         robotmodel->image_pubs[s].publish(image_msg);
       }
 
-      //Get latest depth data
-      //Translate into ROS message format and publish
-      //Skip if there are no subscribers
+      // Get latest depth data
+      // Translate into ROS message format and publish
+      // Skip if there are no subscribers
       if (robotmodel->depth_pubs[s].getNumSubscribers() > 0 && cameramodel->FrameDepth())
       {
         sensor_msgs::Image depth_msg;
         depth_msg.height = cameramodel->getHeight();
         depth_msg.width = cameramodel->getWidth();
-        depth_msg.encoding = this->isDepthCanonical ? sensor_msgs::image_encodings::TYPE_32FC1 : sensor_msgs::image_encodings::TYPE_16UC1;
-        //this->depthMsgs[r].is_bigendian="";
+        depth_msg.encoding = (this->isDepthCanonical ? sensor_msgs::image_encodings::TYPE_32FC1 :
+          sensor_msgs::image_encodings::TYPE_16UC1);
+
+        // this->depthMsgs[r].is_bigendian="";
         int sz = this->isDepthCanonical ? sizeof(float) : sizeof(uint16_t);
         size_t len = depth_msg.width * depth_msg.height;
         depth_msg.step = depth_msg.width * sz;
         depth_msg.data.resize(len * sz);
 
-        //processing data according to REP118
+        // processing data according to REP118
         if (this->isDepthCanonical)
         {
           double nearClip = cameramodel->getCamera().nearClip();
           double farClip = cameramodel->getCamera().farClip();
           memcpy(&(depth_msg.data[0]), cameramodel->FrameDepth(), len * sz);
-          float * data = (float*) & (depth_msg.data[0]);
+          float * data = reinterpret_cast<float *>(&(depth_msg.data[0]));
           for (size_t i = 0; i < len; ++i)
             if (data[i] <= nearClip)
               data[i] = -INFINITY;
@@ -652,17 +677,18 @@ StageNode::WorldCallback()
         }
         else
         {
-          int nearClip = (int)(cameramodel->getCamera().nearClip() * 1000);
-          int farClip = (int)(cameramodel->getCamera().farClip() * 1000);
+          int nearClip = static_cast<int>(cameramodel->getCamera().nearClip() * 1000);
+          int farClip = static_cast<int>(cameramodel->getCamera().farClip() * 1000);
           for (size_t i = 0; i < len; ++i)
           {
-            int v = (int)(cameramodel->FrameDepth()[i] * 1000);
+            int v = static_cast<int>(cameramodel->FrameDepth()[i] * 1000);
             if (v <= nearClip || v >= farClip) v = 0;
-            ((uint16_t*) & (depth_msg.data[0]))[i] = (uint16_t)((v <= nearClip || v >= farClip) ? 0 : v);
+            (reinterpret_cast<uint16_t*> (&(depth_msg.data[0])))[i] = static_cast<uint16_t>(
+              (v <= nearClip || v >= farClip) ? 0 : v);
           }
         }
 
-        //invert the opengl weirdness
+        // invert the opengl weirdness
         int height = depth_msg.height - 1;
         int linewidth = depth_msg.width * sz;
 
@@ -675,42 +701,48 @@ StageNode::WorldCallback()
         }
 
         if (robotmodel->cameramodels.size() > 1)
-          depth_msg.header.frame_id = mapName("camera", r, s, static_cast<Stg::Model*>(robotmodel->positionmodel));
+          depth_msg.header.frame_id = mapName("camera", r, s,
+            static_cast<Stg::Model*>(robotmodel->positionmodel));
         else
-          depth_msg.header.frame_id = mapName("camera", r, static_cast<Stg::Model*>(robotmodel->positionmodel));
+          depth_msg.header.frame_id = mapName("camera", r,
+            static_cast<Stg::Model*>(robotmodel->positionmodel));
         depth_msg.header.stamp = sim_time;
         robotmodel->depth_pubs[s].publish(depth_msg);
       }
 
-      //sending camera's tf and info only if image or depth topics are subscribed to
+      // sending camera's tf and info only if image or depth topics are subscribed to
       if ((robotmodel->image_pubs[s].getNumSubscribers() > 0 && cameramodel->FrameColor())
           || (robotmodel->depth_pubs[s].getNumSubscribers() > 0 && cameramodel->FrameDepth()))
       {
-
         Stg::Pose lp = cameramodel->GetPose();
         tf::Quaternion Q;
         Q.setRPY(
           (cameramodel->getCamera().pitch()*M_PI / 180.0) - M_PI,
           0.0,
-          lp.a + (cameramodel->getCamera().yaw()*M_PI / 180.0) - robotmodel->positionmodel->GetPose().a
-        );
+          lp.a + (cameramodel->getCamera().yaw()*M_PI / 180.0) - robotmodel->positionmodel->GetPose().a);
 
         tf::Transform tr =  tf::Transform(Q, tf::Point(lp.x, lp.y, robotmodel->positionmodel->GetGeom().size.z + lp.z));
 
         if (robotmodel->cameramodels.size() > 1)
           tf.sendTransform(tf::StampedTransform(tr, sim_time,
-                                                mapName("base_link", r, static_cast<Stg::Model*>(robotmodel->positionmodel)),
-                                                mapName("camera", r, s, static_cast<Stg::Model*>(robotmodel->positionmodel))));
+                                                mapName("base_link", r,
+                                                  static_cast<Stg::Model*>(robotmodel->positionmodel)),
+                                                mapName("camera", r, s,
+                                                  static_cast<Stg::Model*>(robotmodel->positionmodel))));
         else
           tf.sendTransform(tf::StampedTransform(tr, sim_time,
-                                                mapName("base_link", r, static_cast<Stg::Model*>(robotmodel->positionmodel)),
-                                                mapName("camera", r, static_cast<Stg::Model*>(robotmodel->positionmodel))));
+                                                mapName("base_link", r,
+                                                  static_cast<Stg::Model*>(robotmodel->positionmodel)),
+                                                mapName("camera", r,
+                                                  static_cast<Stg::Model*>(robotmodel->positionmodel))));
 
         sensor_msgs::CameraInfo camera_msg;
         if (robotmodel->cameramodels.size() > 1)
-          camera_msg.header.frame_id = mapName("camera", r, s, static_cast<Stg::Model*>(robotmodel->positionmodel));
+          camera_msg.header.frame_id = mapName("camera", r, s,
+            static_cast<Stg::Model*>(robotmodel->positionmodel));
         else
-          camera_msg.header.frame_id = mapName("camera", r, static_cast<Stg::Model*>(robotmodel->positionmodel));
+          camera_msg.header.frame_id = mapName("camera", r,
+            static_cast<Stg::Model*>(robotmodel->positionmodel));
         camera_msg.header.stamp = sim_time;
         camera_msg.height = cameramodel->getHeight();
         camera_msg.width = cameramodel->getWidth();
@@ -720,12 +752,12 @@ StageNode::WorldCallback()
         cy = camera_msg.height / 2.0;
         double fovh = cameramodel->getCamera().horizFov() * M_PI / 180.0;
         double fovv = cameramodel->getCamera().vertFov() * M_PI / 180.0;
-        //double fx_ = 1.43266615300557*this->cameramodels[r]->getWidth()/tan(fovh);
-        //double fy_ = 1.43266615300557*this->cameramodels[r]->getHeight()/tan(fovv);
+        // double fx_ = 1.43266615300557*this->cameramodels[r]->getWidth()/tan(fovh);
+        // double fy_ = 1.43266615300557*this->cameramodels[r]->getHeight()/tan(fovv);
         fx = cameramodel->getWidth() / (2 * tan(fovh / 2));
         fy = cameramodel->getHeight() / (2 * tan(fovv / 2));
 
-        //ROS_INFO("fx=%.4f,%.4f; fy=%.4f,%.4f", fx, fx_, fy, fy_);
+        // ROS_INFO("fx=%.4f,%.4f; fy=%.4f,%.4f", fx, fx_, fy, fy_);
 
 
         camera_msg.D.resize(4, 0.0);
@@ -747,9 +779,7 @@ StageNode::WorldCallback()
         camera_msg.P[10] = 1.0;
 
         robotmodel->camera_pubs[s].publish(camera_msg);
-
       }
-
     }
   }
 

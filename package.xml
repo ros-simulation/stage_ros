@@ -2,7 +2,7 @@
 <package format="2">
   <name>stage_ros</name>
   <version>1.8.0</version>
-  <description>This package provides ROS specific hooks for stage</description>
+  <description>ROS specific hooks for stage</description>
 
   <maintainer email="william@osrfoundation.org">William Woodall</maintainer>
 
@@ -15,7 +15,7 @@
   <author email="gerky@osrfoundation.org">Brian Gerky</author>
 
   <buildtool_depend>catkin</buildtool_depend>
-  <build_depend>rostest</build_depend>
+  <build_depend>roslint</build_depend>
 
   <depend>boost</depend>
   <depend>geometry_msgs</depend>
@@ -26,4 +26,6 @@
   <depend>std_msgs</depend>
   <depend>std_srvs</depend>
   <depend>tf</depend>
+
+  <test_depend>rostest</test_depend>
 </package>
