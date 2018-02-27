@@ -6,11 +6,15 @@ find_package(catkin REQUIRED
     geometry_msgs
     nav_msgs
     roscpp
+    roslint
     sensor_msgs
     std_msgs
     std_srvs
     tf
 )
+
+roslint_cpp()
+roslint_add_test()
 
 find_package(Boost REQUIRED COMPONENTS system thread)
 
@@ -22,7 +26,13 @@ include_directories(
   ${STAGE_INCLUDE_DIRS}
 )
 
-catkin_package()
+catkin_package(
+  CATKIN_DEPENDS
+    geometry_msgs
+    nav_msgs
+    sensor_msgs
+    std_msgs
+)
 
 # Declare a cpp executable
 add_executable(stageros src/stageros.cpp)
