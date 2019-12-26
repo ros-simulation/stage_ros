@@ -141,6 +141,8 @@ private:
 
     std::string base_laser_frame_id_;
 
+    std::string base_camera_frame_id_;
+
     // Current simulation time
     ros::Time sim_time;
     
@@ -301,6 +303,9 @@ StageNode::StageNode(int argc, char** argv, bool gui, const char* fname, bool us
 
     if(!localn.getParam("base_laser_frame_id", this->base_laser_frame_id_))
         this->base_laser_frame_id_="base_laser_link";
+
+    if(!localn.getParam("base_camera_frame_id", this->base_camera_frame_id_))
+        this->base_camera_frame_id_="camera";
 
     if(!localn.getParam("is_depth_canonical", isDepthCanonical))
         isDepthCanonical = true;
@@ -625,9 +630,9 @@ StageNode::WorldCallback()
                 }
 
                 if (robotmodel->cameramodels.size() > 1)
-                    image_msg.header.frame_id = mapName("camera", r, s, static_cast<Stg::Model*>(robotmodel->positionmodel));
+                    image_msg.header.frame_id = mapName(this->base_camera_frame_id_.c_str(), r, s, static_cast<Stg::Model*>(robotmodel->positionmodel));
                 else
-                    image_msg.header.frame_id = mapName("camera", r,static_cast<Stg::Model*>(robotmodel->positionmodel));
+                    image_msg.header.frame_id = mapName(this->base_camera_frame_id_.c_str(), r,static_cast<Stg::Model*>(robotmodel->positionmodel));
                 image_msg.header.stamp = sim_time;
 
                 robotmodel->image_pubs[s].publish(image_msg);
@@ -683,9 +688,9 @@ StageNode::WorldCallback()
                 }
 
                 if (robotmodel->cameramodels.size() > 1)
-                    depth_msg.header.frame_id = mapName("camera", r, s, static_cast<Stg::Model*>(robotmodel->positionmodel));
+                    depth_msg.header.frame_id = mapName(this->base_camera_frame_id_.c_str(), r, s, static_cast<Stg::Model*>(robotmodel->positionmodel));
                 else
-                    depth_msg.header.frame_id = mapName("camera", r, static_cast<Stg::Model*>(robotmodel->positionmodel));
+                    depth_msg.header.frame_id = mapName(this->base_camera_frame_id_.c_str(), r, static_cast<Stg::Model*>(robotmodel->positionmodel));
                 depth_msg.header.stamp = sim_time;
                 robotmodel->depth_pubs[s].publish(depth_msg);
             }
@@ -707,17 +712,17 @@ StageNode::WorldCallback()
                 if (robotmodel->cameramodels.size() > 1)
                     tf.sendTransform(tf::StampedTransform(tr, sim_time,
                                                           mapName(this->base_frame_id_.c_str(), r, static_cast<Stg::Model*>(robotmodel->positionmodel)),
-                                                          mapName("camera", r, s, static_cast<Stg::Model*>(robotmodel->positionmodel))));
+                                                          mapName(this->base_camera_frame_id_.c_str(), r, s, static_cast<Stg::Model*>(robotmodel->positionmodel))));
                 else
                     tf.sendTransform(tf::StampedTransform(tr, sim_time,
                                                           mapName(this->base_frame_id_.c_str(), r, static_cast<Stg::Model*>(robotmodel->positionmodel)),
-                                                          mapName("camera", r, static_cast<Stg::Model*>(robotmodel->positionmodel))));
+                                                          mapName(this->base_camera_frame_id_.c_str(), r, static_cast<Stg::Model*>(robotmodel->positionmodel))));
 
                 sensor_msgs::CameraInfo camera_msg;
                 if (robotmodel->cameramodels.size() > 1)
-                    camera_msg.header.frame_id = mapName("camera", r, s, static_cast<Stg::Model*>(robotmodel->positionmodel));
+                    camera_msg.header.frame_id = mapName(this->base_camera_frame_id_.c_str(), r, s, static_cast<Stg::Model*>(robotmodel->positionmodel));
                 else
-                    camera_msg.header.frame_id = mapName("camera", r, static_cast<Stg::Model*>(robotmodel->positionmodel));
+                    camera_msg.header.frame_id = mapName(this->base_camera_frame_id_.c_str(), r, static_cast<Stg::Model*>(robotmodel->positionmodel));
                 camera_msg.header.stamp = sim_time;
                 camera_msg.height = cameramodel->getHeight();
                 camera_msg.width = cameramodel->getWidth();
