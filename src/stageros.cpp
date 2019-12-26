@@ -133,6 +133,20 @@ private:
     ros::Time base_last_cmd;
     ros::Duration base_watchdog_timeout;
 
+    std::string odom_frame_id_;
+
+    std::string base_frame_id_;
+
+    std::string base_frame_footprint_id_;
+
+    std::vector<std::string> laser_frame_ids_;
+
+    std::vector<std::string> camera_frame_ids_;
+
+    std::vector<bool> publish_laser_tfs_;
+
+    std::vector<bool> publish_camera_tfs_;
+
     // Current simulation time
     ros::Time sim_time;
     
@@ -281,6 +295,27 @@ StageNode::StageNode(int argc, char** argv, bool gui, const char* fname, bool us
     if(!localn.getParam("base_watchdog_timeout", t))
         t = 0.2;
     this->base_watchdog_timeout.fromSec(t);
+
+    if(!localn.getParam("odom_frame_id", this->odom_frame_id_))
+        this->odom_frame_id_="odom";
+
+    if(!localn.getParam("base_link_frame_id", this->base_frame_id_))
+        this->base_frame_id_="base_link";
+
+    if(!localn.getParam("base_footprint_frame_id", this->base_frame_footprint_id_))
+        this->base_frame_footprint_id_="base_footprint";
+
+    if(!localn.getParam("laser_frame_ids", this->laser_frame_ids_))
+        this->laser_frame_ids_.push_back("base_laser");
+
+    if(!localn.getParam("camera_frame_ids", this->camera_frame_ids_))
+        this->camera_frame_ids_.push_back("camera");
+
+    if(!localn.getParam("publish_laser_tfs", this->publish_laser_tfs_))
+        this->publish_laser_tfs_.push_back(true);
+
+    if(!localn.getParam("publish_camera_tfs", this->publish_camera_tfs_))
+        this->publish_camera_tfs_.push_back(true);
 
     if(!localn.getParam("is_depth_canonical", isDepthCanonical))
         isDepthCanonical = true;
@@ -465,7 +500,7 @@ StageNode::WorldCallback()
                 msg.angle_max = +sensor.fov/2.0;
                 msg.angle_increment = sensor.fov/(double)(sensor.sample_count-1);
                 msg.range_min = sensor.range.min;
-                msg.range_max = sensor.range.max;
+                msg.range_max = sensor.range.max - 0.1;
                 msg.ranges.resize(sensor.ranges.size());
                 msg.intensities.resize(sensor.intensities.size());
 
@@ -475,10 +510,16 @@ StageNode::WorldCallback()
                     msg.intensities[i] = sensor.intensities[i];
                 }
 
-                if (robotmodel->lasermodels.size() > 1)
-                    msg.header.frame_id = mapName("base_laser_link", r, s, static_cast<Stg::Model*>(robotmodel->positionmodel));
+                if (robotmodel->lasermodels.size() > 1){
+                    if (robotmodel->lasermodels.size() != this->laser_frame_ids_.size()){
+                      ROS_INFO("Size of laser_frame_ids mismatches the number of lasers, applying default frame id naming");
+                      msg.header.frame_id = mapName(this->laser_frame_ids_[0].c_str(), r, s, static_cast<Stg::Model*>(robotmodel->positionmodel));
+                    }else{
+                      msg.header.frame_id=this->laser_frame_ids_[s];
+                    }
+                }
                 else
-                    msg.header.frame_id = mapName("base_laser_link", r, static_cast<Stg::Model*>(robotmodel->positionmodel));
+                    msg.header.frame_id = mapName(this->laser_frame_ids_[0].c_str(), r, static_cast<Stg::Model*>(robotmodel->positionmodel));
 
                 msg.header.stamp = sim_time;
                 robotmodel->laser_pubs[s].publish(msg);
@@ -491,21 +532,35 @@ StageNode::WorldCallback()
             laserQ.setRPY(0.0, 0.0, lp.a);
             tf::Transform txLaser =  tf::Transform(laserQ, tf::Point(lp.x, lp.y, robotmodel->positionmodel->GetGeom().size.z + lp.z));
 
-            if (robotmodel->lasermodels.size() > 1)
-                tf.sendTransform(tf::StampedTransform(txLaser, sim_time,
-                                                      mapName("base_link", r, static_cast<Stg::Model*>(robotmodel->positionmodel)),
-                                                      mapName("base_laser_link", r, s, static_cast<Stg::Model*>(robotmodel->positionmodel))));
+            if (robotmodel->lasermodels.size() > 1){
+              if (robotmodel->lasermodels.size() != this->laser_frame_ids_.size()){
+                ROS_INFO("Size of laser_frame_ids mismatches the number of lasers, applying default frame id naming");
+                if(publish_laser_tfs_[0]){
+                  tf.sendTransform(tf::StampedTransform(txLaser, sim_time,
+                                                        mapName(this->base_frame_id_.c_str(), r, static_cast<Stg::Model*>(robotmodel->positionmodel)),
+                                                        mapName(this->laser_frame_ids_[0].c_str(), r, s, static_cast<Stg::Model*>(robotmodel->positionmodel))));
+                }
+              }else {
+                if(publish_laser_tfs_[s]){
+                  tf.sendTransform(tf::StampedTransform(txLaser, sim_time,
+                                                        mapName(this->base_frame_id_.c_str(), r, static_cast<Stg::Model*>(robotmodel->positionmodel)),
+                                                        this->laser_frame_ids_[s]));
+                }
+              }
+            }
             else
+              if(publish_laser_tfs_[0]){
                 tf.sendTransform(tf::StampedTransform(txLaser, sim_time,
-                                                      mapName("base_link", r, static_cast<Stg::Model*>(robotmodel->positionmodel)),
-                                                      mapName("base_laser_link", r, static_cast<Stg::Model*>(robotmodel->positionmodel))));
+                                                      mapName(this->base_frame_id_.c_str(), r, static_cast<Stg::Model*>(robotmodel->positionmodel)),
+                                                      mapName(this->laser_frame_ids_[0].c_str(), r, static_cast<Stg::Model*>(robotmodel->positionmodel))));
+              }
         }
 
         //the position of the robot
         tf.sendTransform(tf::StampedTransform(tf::Transform::getIdentity(),
                                               sim_time,
-                                              mapName("base_footprint", r, static_cast<Stg::Model*>(robotmodel->positionmodel)),
-                                              mapName("base_link", r, static_cast<Stg::Model*>(robotmodel->positionmodel))));
+                                              mapName( this->base_frame_footprint_id_.c_str(), r, static_cast<Stg::Model*>(robotmodel->positionmodel)),
+                                              mapName(this->base_frame_id_.c_str(), r, static_cast<Stg::Model*>(robotmodel->positionmodel))));
 
         // Get latest odometry data
         // Translate into ROS message format and publish
@@ -521,7 +576,7 @@ StageNode::WorldCallback()
         //@todo Publish stall on a separate topic when one becomes available
         //this->odomMsgs[r].stall = this->positionmodels[r]->Stall();
         //
-        odom_msg.header.frame_id = mapName("odom", r, static_cast<Stg::Model*>(robotmodel->positionmodel));
+        odom_msg.header.frame_id = mapName(this->odom_frame_id_.c_str(), r, static_cast<Stg::Model*>(robotmodel->positionmodel));
         odom_msg.header.stamp = sim_time;
 
         robotmodel->odom_pub.publish(odom_msg);
@@ -531,8 +586,8 @@ StageNode::WorldCallback()
         tf::quaternionMsgToTF(odom_msg.pose.pose.orientation, odomQ);
         tf::Transform txOdom(odomQ, tf::Point(odom_msg.pose.pose.position.x, odom_msg.pose.pose.position.y, 0.0));
         tf.sendTransform(tf::StampedTransform(txOdom, sim_time,
-                                              mapName("odom", r, static_cast<Stg::Model*>(robotmodel->positionmodel)),
-                                              mapName("base_footprint", r, static_cast<Stg::Model*>(robotmodel->positionmodel))));
+                                              mapName(this->odom_frame_id_.c_str(), r, static_cast<Stg::Model*>(robotmodel->positionmodel)),
+                                              mapName(this->base_frame_footprint_id_.c_str(), r, static_cast<Stg::Model*>(robotmodel->positionmodel))));
 
         // Also publish the ground truth pose and velocity
         Stg::Pose gpose = robotmodel->positionmodel->GetGlobalPose();
@@ -568,7 +623,7 @@ StageNode::WorldCallback()
         ground_truth_msg.twist.twist.linear.z = gvel.z;
         ground_truth_msg.twist.twist.angular.z = gvel.a;
 
-        ground_truth_msg.header.frame_id = mapName("odom", r, static_cast<Stg::Model*>(robotmodel->positionmodel));
+        ground_truth_msg.header.frame_id = mapName(this->odom_frame_id_.c_str(), r, static_cast<Stg::Model*>(robotmodel->positionmodel));
         ground_truth_msg.header.stamp = sim_time;
 
         robotmodel->ground_truth_pub.publish(ground_truth_msg);
@@ -604,10 +659,16 @@ StageNode::WorldCallback()
                     memcpy(&(image_msg.data[(height-y)*linewidth]),temp,linewidth);
                 }
 
-                if (robotmodel->cameramodels.size() > 1)
-                    image_msg.header.frame_id = mapName("camera", r, s, static_cast<Stg::Model*>(robotmodel->positionmodel));
+                if (robotmodel->cameramodels.size() > 1){
+                  if (robotmodel->cameramodels.size() != this->camera_frame_ids_.size()){
+                    ROS_INFO("Size of camera_frame_ids mismatches the number of cameras, applying default frame id naming");
+                    image_msg.header.frame_id = mapName(this->camera_frame_ids_[0].c_str(), r, s, static_cast<Stg::Model*>(robotmodel->positionmodel));
+                  }else{
+                    image_msg.header.frame_id = this->camera_frame_ids_[s];
+                  }
+                }
                 else
-                    image_msg.header.frame_id = mapName("camera", r,static_cast<Stg::Model*>(robotmodel->positionmodel));
+                    image_msg.header.frame_id = mapName(this->camera_frame_ids_[0].c_str(), r,static_cast<Stg::Model*>(robotmodel->positionmodel));
                 image_msg.header.stamp = sim_time;
 
                 robotmodel->image_pubs[s].publish(image_msg);
@@ -662,10 +723,16 @@ StageNode::WorldCallback()
                     memcpy(&(depth_msg.data[(height-y)*linewidth]),temp,linewidth);
                 }
 
-                if (robotmodel->cameramodels.size() > 1)
-                    depth_msg.header.frame_id = mapName("camera", r, s, static_cast<Stg::Model*>(robotmodel->positionmodel));
+                if (robotmodel->cameramodels.size() > 1){
+                  if (robotmodel->cameramodels.size() != this->camera_frame_ids_.size()){
+                    ROS_INFO("Size of camera_frame_ids mismatches the number of cameras, applying default frame id naming");
+                    depth_msg.header.frame_id = mapName(this->camera_frame_ids_[0].c_str(), r, s, static_cast<Stg::Model*>(robotmodel->positionmodel));
+                  }else{
+                    depth_msg.header.frame_id = this->camera_frame_ids_[s];
+                  }
+                }
                 else
-                    depth_msg.header.frame_id = mapName("camera", r, static_cast<Stg::Model*>(robotmodel->positionmodel));
+                    depth_msg.header.frame_id = mapName(this->camera_frame_ids_[0].c_str(), r,static_cast<Stg::Model*>(robotmodel->positionmodel));
                 depth_msg.header.stamp = sim_time;
                 robotmodel->depth_pubs[s].publish(depth_msg);
             }
@@ -684,20 +751,40 @@ StageNode::WorldCallback()
 
                 tf::Transform tr =  tf::Transform(Q, tf::Point(lp.x, lp.y, robotmodel->positionmodel->GetGeom().size.z+lp.z));
 
-                if (robotmodel->cameramodels.size() > 1)
-                    tf.sendTransform(tf::StampedTransform(tr, sim_time,
-                                                          mapName("base_link", r, static_cast<Stg::Model*>(robotmodel->positionmodel)),
-                                                          mapName("camera", r, s, static_cast<Stg::Model*>(robotmodel->positionmodel))));
+                if (robotmodel->cameramodels.size() > 1){
+                    if (robotmodel->cameramodels.size() != this->camera_frame_ids_.size()){
+                      ROS_INFO("Size of camera_frame_ids mismatches the number of cameras, applying default frame id naming");
+                      if(publish_camera_tfs_[0]){
+                        tf.sendTransform(tf::StampedTransform(tr, sim_time,
+                                                              mapName(this->base_frame_id_.c_str(), r, static_cast<Stg::Model*>(robotmodel->positionmodel)),
+                                                              mapName(this->camera_frame_ids_[0].c_str(), r, s, static_cast<Stg::Model*>(robotmodel->positionmodel))));
+                      }
+                    }else {
+                      if(publish_camera_tfs_[s]){
+                        tf.sendTransform(tf::StampedTransform(tr, sim_time,
+                                                              mapName(this->base_frame_id_.c_str(), r, static_cast<Stg::Model*>(robotmodel->positionmodel)),
+                                                              this->camera_frame_ids_[s].c_str()));
+                      }
+                    }
+                }
                 else
+                  if(publish_camera_tfs_[0]){
                     tf.sendTransform(tf::StampedTransform(tr, sim_time,
-                                                          mapName("base_link", r, static_cast<Stg::Model*>(robotmodel->positionmodel)),
-                                                          mapName("camera", r, static_cast<Stg::Model*>(robotmodel->positionmodel))));
+                                                          mapName(this->base_frame_id_.c_str(), r, static_cast<Stg::Model*>(robotmodel->positionmodel)),
+                                                          mapName(this->camera_frame_ids_[0].c_str(), r, static_cast<Stg::Model*>(robotmodel->positionmodel))));
+                  }
 
                 sensor_msgs::CameraInfo camera_msg;
-                if (robotmodel->cameramodels.size() > 1)
-                    camera_msg.header.frame_id = mapName("camera", r, s, static_cast<Stg::Model*>(robotmodel->positionmodel));
+                if (robotmodel->cameramodels.size() > 1){
+                    if (robotmodel->cameramodels.size() != this->camera_frame_ids_.size()){
+                      ROS_INFO("Size of camera_frame_ids mismatches the number of cameras, applying default frame id naming");
+                      camera_msg.header.frame_id = mapName(this->camera_frame_ids_[0].c_str(), r, s, static_cast<Stg::Model*>(robotmodel->positionmodel));
+                    }else {
+                      camera_msg.header.frame_id = this->camera_frame_ids_[s];
+                    }
+                }
                 else
-                    camera_msg.header.frame_id = mapName("camera", r, static_cast<Stg::Model*>(robotmodel->positionmodel));
+                    camera_msg.header.frame_id = mapName(this->camera_frame_ids_[0].c_str(), r, static_cast<Stg::Model*>(robotmodel->positionmodel));
                 camera_msg.header.stamp = sim_time;
                 camera_msg.height = cameramodel->getHeight();
                 camera_msg.width = cameramodel->getWidth();
