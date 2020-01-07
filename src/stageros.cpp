@@ -522,6 +522,7 @@ StageNode::WorldCallback()
         //this->odomMsgs[r].stall = this->positionmodels[r]->Stall();
         //
         odom_msg.header.frame_id = mapName("odom", r, static_cast<Stg::Model*>(robotmodel->positionmodel));
+	odom_msg.child_frame_id = mapName("base_footprint", r, static_cast<Stg::Model*>(robotmodel->positionmodel));
         odom_msg.header.stamp = sim_time;
 
         robotmodel->odom_pub.publish(odom_msg);
