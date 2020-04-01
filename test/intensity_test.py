@@ -3,7 +3,10 @@
 import unittest
 import rospy
 import time
-import Queue as queue
+try:
+    import Queue as queue
+except ImportError:
+    import queue
 from sensor_msgs.msg import LaserScan
 
 PKG = "stage_ros"
