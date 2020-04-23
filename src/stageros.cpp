@@ -144,7 +144,7 @@ private:
 public:
     // Constructor; stage itself needs argc/argv.  fname is the .world file
     // that stage should load.
-    StageNode(int argc, char** argv, bool gui, const char* fname, bool use_model_names);
+    StageNode(int argc, char** argv, const char* fname);
     ~StageNode();
 
     // Subscribe to models of interest.  Currently, we find and subscribe
@@ -271,19 +271,28 @@ StageNode::cmdvelReceived(int idx, const boost::shared_ptr<geometry_msgs::Twist 
     this->base_last_cmd = this->sim_time;
 }
 
-StageNode::StageNode(int argc, char** argv, bool gui, const char* fname, bool use_model_names)
+StageNode::StageNode(int argc, char** argv, const char* fname)
 {
-    this->use_model_names = use_model_names;
+    bool gui;
     this->sim_time.fromSec(0.0);
     this->base_last_cmd.fromSec(0.0);
     double t;
     ros::NodeHandle localn("~");
+
+    if (!localn.getParam("gui", gui))
+      gui = true;
+
+    if (!localn.getParam("use_model_names", use_model_names))
+      use_model_names = false;
+
     if(!localn.getParam("base_watchdog_timeout", t))
         t = 0.2;
-    this->base_watchdog_timeout.fromSec(t);
 
     if(!localn.getParam("is_depth_canonical", isDepthCanonical))
         isDepthCanonical = true;
+
+    this->use_model_names = use_model_names;
+    this->base_watchdog_timeout.fromSec(t);
 
     // We'll check the existence of the world file, because libstage doesn't
     // expose its failure to open it.  Could go further with checks (e.g., is
@@ -757,17 +766,7 @@ main(int argc, char** argv)
 
     ros::init(argc, argv, "stageros");
 
-    bool gui = true;
-    bool use_model_names = false;
-    for(int i=0;i<(argc-1);i++)
-    {
-        if(!strcmp(argv[i], "-g"))
-            gui = false;
-        if(!strcmp(argv[i], "-u"))
-            use_model_names = true;
-    }
-
-    StageNode sn(argc-1,argv,gui,argv[argc-1], use_model_names);
+    StageNode sn(argc-1,argv,argv[argc-1]);
 
     if(sn.SubscribeModels() != 0)
         exit(-1);
