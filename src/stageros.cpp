@@ -40,7 +40,6 @@
 
 // roscpp
 #include <ros/ros.h>
-// #include <std_msgs/Bool.h>
 #include <boost/thread/mutex.hpp>
 #include <boost/thread/thread.hpp>
 #include <sensor_msgs/LaserScan.h>
@@ -49,7 +48,7 @@
 #include <sensor_msgs/CameraInfo.h>
 #include <nav_msgs/Odometry.h>
 #include <geometry_msgs/Twist.h>
-#include <std_msgs/Float64.h>
+#include <std_msgs/Int8.h>
 #include <rosgraph_msgs/Clock.h>
 
 #include <std_srvs/Empty.h>
@@ -167,7 +166,7 @@ public:
 
     // Message callback for a MsgBaseVel message, which set velocities.
     void cmdvelReceived(int idx, const boost::shared_ptr<geometry_msgs::Twist const>& msg);
-    void lightReceived(int idx, const boost::shared_ptr<std_msgs::Float64 const>& msg);
+    void lightReceived(int idx, const boost::shared_ptr<std_msgs::Int8 const>& msg);
 
     // Service callback for soft reset
     bool cb_reset_srv(std_srvs::Empty::Request& request, std_srvs::Empty::Response& response);
@@ -273,7 +272,7 @@ StageNode::cb_reset_srv(std_srvs::Empty::Request& request, std_srvs::Empty::Resp
 
 
 void
-StageNode::lightReceived(int idx, const boost::shared_ptr<std_msgs::Float64 const>& msg)
+StageNode::lightReceived(int idx, const boost::shared_ptr<std_msgs::Int8 const>& msg)
 {
     boost::mutex::scoped_lock lock(msg_lock);
     this->lightmodels[idx]->SetState(msg->data) ;
@@ -405,7 +404,7 @@ StageNode::SubscribeModels()
 
         for (size_t s = 0;  s < new_robot->lasermodels.size(); ++s)
         {
-            new_robot->light_subs.push_back(n_.subscribe<std_msgs::Float64>(mapName(LIGHTS, r, static_cast<Stg::Model*>(new_robot->positionmodel)), 10, boost::bind(&StageNode::lightReceived, this, r, _1)));
+            new_robot->light_subs.push_back(n_.subscribe<std_msgs::Int8>(mapName(LIGHTS, r, static_cast<Stg::Model*>(new_robot->positionmodel)), 10, boost::bind(&StageNode::lightReceived, this, r, _1)));
         }
 
         for (size_t s = 0;  s < new_robot->lasermodels.size(); ++s)
