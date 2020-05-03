@@ -48,6 +48,8 @@
 #include <sensor_msgs/CameraInfo.h>
 #include <nav_msgs/Odometry.h>
 #include <geometry_msgs/Twist.h>
+#include <std_msgs/Int8.h>
+#include <std_msgs/String.h>
 #include <rosgraph_msgs/Clock.h>
 
 #include <std_srvs/Empty.h>
@@ -62,6 +64,8 @@
 #define BASE_SCAN "base_scan"
 #define BASE_POSE_GROUND_TRUTH "base_pose_ground_truth"
 #define CMD_VEL "cmd_vel"
+#define LIGHTS "light"
+#define SETLIGHTS "set_light"
 
 // Our node
 class StageNode
@@ -78,6 +82,7 @@ private:
     std::vector<Stg::ModelCamera *> cameramodels;
     std::vector<Stg::ModelRanger *> lasermodels;
     std::vector<Stg::ModelPosition *> positionmodels;
+    std::vector<Stg::ModelLightIndicator *> lightmodels; 
 
     //a structure representing a robot inthe simulator
     struct StageRobot
@@ -86,6 +91,7 @@ private:
         Stg::ModelPosition* positionmodel; //one position
         std::vector<Stg::ModelCamera *> cameramodels; //multiple cameras per position
         std::vector<Stg::ModelRanger *> lasermodels; //multiple rangers per position
+        std::vector<Stg::ModelLightIndicator *> lightmodels; //multiple lights per position
 
         //ros publishers
         ros::Publisher odom_pub; //one odom
@@ -94,8 +100,9 @@ private:
         std::vector<ros::Publisher> image_pubs; //multiple images
         std::vector<ros::Publisher> depth_pubs; //multiple depths
         std::vector<ros::Publisher> camera_pubs; //multiple cameras
-        std::vector<ros::Publisher> laser_pubs; //multiple lasers
-
+        std::vector<ros::Publisher> laser_pubs; //multiple light
+        
+        std::vector<ros::Subscriber> light_subs; //multiple lasers
         ros::Subscriber cmdvel_sub; //one cmd_vel subscriber
     };
 
@@ -144,7 +151,7 @@ private:
 public:
     // Constructor; stage itself needs argc/argv.  fname is the .world file
     // that stage should load.
-    StageNode(int argc, char** argv, bool gui, const char* fname, bool use_model_names);
+    StageNode(int argc, char** argv, const char* fname);
     ~StageNode();
 
     // Subscribe to models of interest.  Currently, we find and subscribe
@@ -161,6 +168,8 @@ public:
 
     // Message callback for a MsgBaseVel message, which set velocities.
     void cmdvelReceived(int idx, const boost::shared_ptr<geometry_msgs::Twist const>& msg);
+    void lightReceived(int idx, const boost::shared_ptr<std_msgs::Int8 const>& msg);
+    void lightColorReceived(int idx, const boost::shared_ptr<std_msgs::String const>& msg);
 
     // Service callback for soft reset
     bool cb_reset_srv(std_srvs::Empty::Request& request, std_srvs::Empty::Response& response);
@@ -183,11 +192,11 @@ StageNode::mapName(const char *name, size_t robotID, Stg::Model* mod) const
 
         if ((found==std::string::npos) && umn)
         {
-            snprintf(buf, sizeof(buf), "/%s/%s", ((Stg::Ancestor *) mod)->Token(), name);
+            snprintf(buf, sizeof(buf), "%s/%s", ((Stg::Ancestor *) mod)->Token(), name);
         }
         else
         {
-            snprintf(buf, sizeof(buf), "/robot_%u/%s", (unsigned int)robotID, name);
+            snprintf(buf, sizeof(buf), "robot_%u/%s", (unsigned int)robotID, name);
         }
 
         return buf;
@@ -209,11 +218,11 @@ StageNode::mapName(const char *name, size_t robotID, size_t deviceID, Stg::Model
 
         if ((found==std::string::npos) && umn)
         {
-            snprintf(buf, sizeof(buf), "/%s/%s_%u", ((Stg::Ancestor *) mod)->Token(), name, (unsigned int)deviceID);
+            snprintf(buf, sizeof(buf), "%s/%s_%u", ((Stg::Ancestor *) mod)->Token(), name, (unsigned int)deviceID);
         }
         else
         {
-            snprintf(buf, sizeof(buf), "/robot_%u/%s_%u", (unsigned int)robotID, name, (unsigned int)deviceID);
+            snprintf(buf, sizeof(buf), "robot_%u/%s_%u", (unsigned int)robotID, name, (unsigned int)deviceID);
         }
 
         return buf;
@@ -221,7 +230,7 @@ StageNode::mapName(const char *name, size_t robotID, size_t deviceID, Stg::Model
     else
     {
         static char buf[100];
-        snprintf(buf, sizeof(buf), "/%s_%u", name, (unsigned int)deviceID);
+        snprintf(buf, sizeof(buf), "%s_%u", name, (unsigned int)deviceID);
         return buf;
     }
 }
@@ -234,6 +243,11 @@ StageNode::ghfunc(Stg::Model* mod, StageNode* node)
   if (dynamic_cast<Stg::ModelRanger *>(mod)) {
      node->lasermodels.push_back(dynamic_cast<Stg::ModelRanger *>(mod));
   }
+
+  if (dynamic_cast<Stg::ModelLightIndicator *>(mod)) {
+     node->lightmodels.push_back(dynamic_cast<Stg::ModelLightIndicator *>(mod));
+  }
+
   if (dynamic_cast<Stg::ModelPosition *>(mod)) {
      Stg::ModelPosition * p = dynamic_cast<Stg::ModelPosition *>(mod);
       // remember initial poses
@@ -260,6 +274,21 @@ StageNode::cb_reset_srv(std_srvs::Empty::Request& request, std_srvs::Empty::Resp
 }
 
 
+void
+StageNode::lightReceived(int idx, const boost::shared_ptr<std_msgs::Int8 const>& msg)
+{
+    boost::mutex::scoped_lock lock(msg_lock);
+    this->lightmodels[idx]->SetState(msg->data) ;
+}
+
+void
+StageNode::lightColorReceived(int idx, const boost::shared_ptr<std_msgs::String const>& msg)
+{
+    boost::mutex::scoped_lock lock(msg_lock);
+    this->lightmodels[idx]->SetLightColor(msg->data) ;
+}
+
+
 
 void
 StageNode::cmdvelReceived(int idx, const boost::shared_ptr<geometry_msgs::Twist const>& msg)
@@ -271,19 +300,28 @@ StageNode::cmdvelReceived(int idx, const boost::shared_ptr<geometry_msgs::Twist 
     this->base_last_cmd = this->sim_time;
 }
 
-StageNode::StageNode(int argc, char** argv, bool gui, const char* fname, bool use_model_names)
+StageNode::StageNode(int argc, char** argv, const char* fname)
 {
-    this->use_model_names = use_model_names;
+    bool gui;
     this->sim_time.fromSec(0.0);
     this->base_last_cmd.fromSec(0.0);
     double t;
     ros::NodeHandle localn("~");
+
+    if (!localn.getParam("gui", gui))
+      gui = true;
+
+    if (!localn.getParam("use_model_names", use_model_names))
+      use_model_names = false;
+
     if(!localn.getParam("base_watchdog_timeout", t))
         t = 0.2;
-    this->base_watchdog_timeout.fromSec(t);
 
     if(!localn.getParam("is_depth_canonical", isDepthCanonical))
         isDepthCanonical = true;
+
+    this->use_model_names = use_model_names;
+    this->base_watchdog_timeout.fromSec(t);
 
     // We'll check the existence of the world file, because libstage doesn't
     // expose its failure to open it.  Could go further with checks (e.g., is
@@ -354,15 +392,33 @@ StageNode::SubscribeModels()
             }
         }
 
+        for (size_t s = 0; s < this->lightmodels.size(); s++)
+        {
+            if (this->lightmodels[s] and this->lightmodels[s]->Parent() == new_robot->positionmodel)
+            {
+                new_robot->lightmodels.push_back(this->lightmodels[s]);
+                this->lightmodels[s]->Subscribe();
+
+		ROS_INFO( "subscribed to Stage light model \"%s\"", this->lightmodels[s]->Token() ); 
+            }
+        }
+
 	// TODO - print the topic names nicely as well
-        ROS_INFO("Robot %s provided %lu rangers and %lu cameras",
+        ROS_INFO("Robot %s provided %lu rangers %lu lights  and %lu cameras",
 		 new_robot->positionmodel->Token(),
 		 new_robot->lasermodels.size(),
+         new_robot->lightmodels.size(),
 		 new_robot->cameramodels.size() );
 
         new_robot->odom_pub = n_.advertise<nav_msgs::Odometry>(mapName(ODOM, r, static_cast<Stg::Model*>(new_robot->positionmodel)), 10);
         new_robot->ground_truth_pub = n_.advertise<nav_msgs::Odometry>(mapName(BASE_POSE_GROUND_TRUTH, r, static_cast<Stg::Model*>(new_robot->positionmodel)), 10);
         new_robot->cmdvel_sub = n_.subscribe<geometry_msgs::Twist>(mapName(CMD_VEL, r, static_cast<Stg::Model*>(new_robot->positionmodel)), 10, boost::bind(&StageNode::cmdvelReceived, this, r, _1));
+
+        for (size_t s = 0;  s < new_robot->lightmodels.size(); ++s)
+        {
+            new_robot->light_subs.push_back(n_.subscribe<std_msgs::Int8>(mapName(LIGHTS, r, static_cast<Stg::Model*>(new_robot->positionmodel)), 10, boost::bind(&StageNode::lightReceived, this, r, _1)));
+            new_robot->light_subs.push_back(n_.subscribe<std_msgs::String>(mapName(SETLIGHTS, r, static_cast<Stg::Model*>(new_robot->positionmodel)), 10, boost::bind(&StageNode::lightColorReceived, this, r, _1)));
+        }
 
         for (size_t s = 0;  s < new_robot->lasermodels.size(); ++s)
         {
@@ -410,7 +466,7 @@ StageNode::UpdateWorld()
 {
     return this->world->UpdateAll();
 }
-
+bool global_state = true;
 void
 StageNode::WorldCallback()
 {
@@ -443,7 +499,6 @@ StageNode::WorldCallback()
     for (size_t r = 0; r < this->robotmodels_.size(); ++r)
     {
         StageRobot const * robotmodel = this->robotmodels_[r];
-
         //loop on the laser devices for the current robot
         for (size_t s = 0; s < robotmodel->lasermodels.size(); ++s)
         {
@@ -757,17 +812,7 @@ main(int argc, char** argv)
 
     ros::init(argc, argv, "stageros");
 
-    bool gui = true;
-    bool use_model_names = false;
-    for(int i=0;i<(argc-1);i++)
-    {
-        if(!strcmp(argv[i], "-g"))
-            gui = false;
-        if(!strcmp(argv[i], "-u"))
-            use_model_names = true;
-    }
-
-    StageNode sn(argc-1,argv,gui,argv[argc-1], use_model_names);
+    StageNode sn(argc-1,argv,argv[argc-1]);
 
     if(sn.SubscribeModels() != 0)
         exit(-1);
