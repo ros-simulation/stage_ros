@@ -49,6 +49,7 @@
 #include <nav_msgs/Odometry.h>
 #include <geometry_msgs/Twist.h>
 #include <std_msgs/Int8.h>
+#include <std_msgs/String.h>
 #include <rosgraph_msgs/Clock.h>
 
 #include <std_srvs/Empty.h>
@@ -64,6 +65,7 @@
 #define BASE_POSE_GROUND_TRUTH "base_pose_ground_truth"
 #define CMD_VEL "cmd_vel"
 #define LIGHTS "light"
+#define SETLIGHTS "set_light"
 
 // Our node
 class StageNode
@@ -167,6 +169,7 @@ public:
     // Message callback for a MsgBaseVel message, which set velocities.
     void cmdvelReceived(int idx, const boost::shared_ptr<geometry_msgs::Twist const>& msg);
     void lightReceived(int idx, const boost::shared_ptr<std_msgs::Int8 const>& msg);
+    void lightColorReceived(int idx, const boost::shared_ptr<std_msgs::String const>& msg);
 
     // Service callback for soft reset
     bool cb_reset_srv(std_srvs::Empty::Request& request, std_srvs::Empty::Response& response);
@@ -277,6 +280,15 @@ StageNode::lightReceived(int idx, const boost::shared_ptr<std_msgs::Int8 const>&
     boost::mutex::scoped_lock lock(msg_lock);
     this->lightmodels[idx]->SetState(msg->data) ;
 }
+
+void
+StageNode::lightColorReceived(int idx, const boost::shared_ptr<std_msgs::String const>& msg)
+{
+    boost::mutex::scoped_lock lock(msg_lock);
+    this->lightmodels[idx]->SetLightColor(msg->data) ;
+}
+
+
 
 void
 StageNode::cmdvelReceived(int idx, const boost::shared_ptr<geometry_msgs::Twist const>& msg)
@@ -402,9 +414,10 @@ StageNode::SubscribeModels()
         new_robot->ground_truth_pub = n_.advertise<nav_msgs::Odometry>(mapName(BASE_POSE_GROUND_TRUTH, r, static_cast<Stg::Model*>(new_robot->positionmodel)), 10);
         new_robot->cmdvel_sub = n_.subscribe<geometry_msgs::Twist>(mapName(CMD_VEL, r, static_cast<Stg::Model*>(new_robot->positionmodel)), 10, boost::bind(&StageNode::cmdvelReceived, this, r, _1));
 
-        for (size_t s = 0;  s < new_robot->lasermodels.size(); ++s)
+        for (size_t s = 0;  s < new_robot->lightmodels.size(); ++s)
         {
             new_robot->light_subs.push_back(n_.subscribe<std_msgs::Int8>(mapName(LIGHTS, r, static_cast<Stg::Model*>(new_robot->positionmodel)), 10, boost::bind(&StageNode::lightReceived, this, r, _1)));
+            new_robot->light_subs.push_back(n_.subscribe<std_msgs::String>(mapName(SETLIGHTS, r, static_cast<Stg::Model*>(new_robot->positionmodel)), 10, boost::bind(&StageNode::lightColorReceived, this, r, _1)));
         }
 
         for (size_t s = 0;  s < new_robot->lasermodels.size(); ++s)
