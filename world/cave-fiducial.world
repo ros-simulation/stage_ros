@@ -1,0 +1,118 @@
+# cave-fiducial.world 
+# Authors: Markus Macsek
+
+include "include/hokuyolaser.inc"
+include "include/pioneer2dx.inc"
+include "include/qrcode.inc"
+
+resolution 0.02
+interval_sim 100  
+
+
+define floorplan model
+(
+  name "cave"
+  color "black"
+  size [16.000 16.000 0.800]
+  pose [0 0 0 0]
+  bitmap "bitmaps/cave.png"
+
+  # bounding box
+  boundary 1
+  
+  # GUI properties
+  gui_nose 0
+  gui_grid 0
+  gui_outline 0
+  gui_move 0
+
+  # determine how the model appears in various sensors
+  fiducial_return 0
+  fiducial_key 0
+  obstacle_return 1
+  ranger_return 1
+  blob_return 0
+  gripper_return 0
+)
+
+window
+(
+  size [ 635.000 666.000 ] # in pixels
+  # camera options
+  scale 36.995   # pixels per meter
+  center [ -0.040  -0.274 ]
+  rotate [ 0  0 ]
+  
+  # GUI options
+  show_data 1
+  show_flags 1
+  show_blocks 1
+  show_clock 1
+  show_footprints 0
+  show_grid 1
+  show_trailarrows 0
+  show_trailrise 0
+  show_trailfast 0
+  show_occupancy 0
+  pcam_on 0
+  screenshots 0
+)
+
+floorplan( )
+
+qrcode
+(
+  pose [  5  5 0 0 ]
+  fiducial_return 1
+)
+qrcode
+(
+  pose [ 0  7 0 0 ]
+  fiducial_return 2
+)
+qrcode
+(
+  pose [ -5  5 0 0 ]
+  fiducial_return 3
+)
+qrcode
+(
+  pose [ -7 0 0 0 ]
+  fiducial_return 4
+)
+qrcode
+(
+  pose [  -5  -5 0 0 ]
+  fiducial_return 5
+)
+qrcode
+(
+  pose [  0 -7 0 0 ]
+  fiducial_return 6
+)
+qrcode
+(
+  pose [ 5  -5 0 0 ]
+  fiducial_return 7
+)
+qrcode
+(
+  pose [  -3 -0 0 0 ]
+  fiducial_return 8
+)
+qrcode
+(
+  pose [  0 3 0 0 ]
+  fiducial_return 9
+)
+
+pioneer2dx_no_sonar 
+(
+  name "robot_0"
+
+  color "red"
+  pose [ -7 -7 0 45 ] 
+
+  hokuyolaser(pose [ 0.225 0.000 -0.15 0.0 ])
+  qrcodereader(pose [ 0.225 0.0 -0.15 0.0 ])
+)

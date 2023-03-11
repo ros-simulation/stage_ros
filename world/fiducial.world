@@ -1,0 +1,110 @@
+# fiducial.world 
+# Authors: Markus Macsek
+
+include "include/hokuyolaser.inc"
+include "include/pioneer2dx.inc"
+include "include/qrcode.inc"
+
+resolution 0.02
+interval_sim 100  
+
+
+define floorplan model
+(
+  color "black"
+  size [18.0 18.0 1.0]
+  pose [0 0 0 0]
+  bitmap "bitmaps/rectangle.png"
+
+  # GUI properties
+  gui_nose 0
+  gui_grid 0
+  gui_outline 0
+  gui_move 0
+
+  # determine how the model appears in various sensors
+  fiducial_return 0
+  fiducial_key 0
+  obstacle_return 1
+  ranger_return 1
+  blob_return 0
+  gripper_return 0
+)
+
+window
+(
+  size [ 500.0 500.0 ] # in pixels
+
+  # camera options
+  scale 25.0  # pixels per meter
+  center [ 0  0 ] 
+  rotate [ 0  0 ]
+
+  # GUI options
+  show_data 1
+  show_flags 1
+  show_blocks 1
+  show_clock 1
+  show_footprints 0
+  show_grid 1
+  show_trailarrows 0
+  show_trailrise 0
+  show_trailfast 0
+  show_occupancy 0
+  pcam_on 0
+  screenshots 0
+)
+
+floorplan( )
+
+qrcode
+(
+  pose [  3  3 0 20 ]
+  fiducial_return 1
+)
+qrcode
+(
+  pose [ -3  3 0 0 ]
+  fiducial_return 2
+)
+qrcode
+(
+  pose [  3 -3 0 80 ]
+  fiducial_return 3
+)
+qrcode
+(
+  pose [ -3 -3 0 0 ]
+  fiducial_return 4
+)
+qrcode
+(
+  pose [  6  0 0 20 ]
+  fiducial_return 5
+)
+qrcode
+(
+  pose [  0  6 0 0 ]
+  fiducial_return 6
+)
+qrcode
+(
+  pose [ -6  0 0 30 ]
+  fiducial_return 7
+)
+qrcode
+(
+  pose [  0 -6 0 0 ]
+  fiducial_return 8
+)
+
+pioneer2dx_no_sonar 
+(
+  name "robot_0"
+
+  color "red"
+  pose [ 0 -5 0 0 ]
+
+  hokuyolaser(pose [ 0.225 0.000 -0.15 0.0 ])
+  qrcodereader(pose [ 0.225 0.0 -0.15 0.0 ])
+)

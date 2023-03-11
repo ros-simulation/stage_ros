@@ -1,0 +1,12 @@
+<launch>
+  <arg name="world" default="cave.world" /> <!-- cave.world, cave_multi.world, fiducial.world, line.world, ... -->
+  <arg name="constrained" default="true" /> <!-- enforces speed contrains on each wheel, ... -->
+
+  <!-- loads the stage simulation -->
+  <node name="stage_ros" pkg="stage_ros" type="stageros" args="$(find stage_ros)/world/$(arg world)">
+      <param name="constrainedDiffDrive" value="$(arg constrained)" />
+      <remap from="scan" to="base_scan" />
+      <remap from="cmd_vel" to="cmd_vel" />
+      <remap from="odom" to="odom" />
+  </node>
+</launch>
