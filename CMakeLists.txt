@@ -14,7 +14,7 @@ find_package(catkin REQUIRED
 
 find_package(Boost REQUIRED COMPONENTS system thread)
 
-find_package(stage REQUIRED)
+find_package(stage 4.3.0 REQUIRED)
 
 include_directories(
   ${catkin_INCLUDE_DIRS}
