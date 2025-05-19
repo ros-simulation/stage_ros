@@ -27,6 +27,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sstream>
 
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -124,8 +125,8 @@ private:
 
     // Appends the given robot ID to the given message name.  If omitRobotID
     // is true, an unaltered copy of the name is returned.
-    const char *mapName(const char *name, size_t robotID, Stg::Model* mod) const;
-    const char *mapName(const char *name, size_t robotID, size_t deviceID, Stg::Model* mod) const;
+    std::string mapName(std::string name, size_t robotID, Stg::Model* mod) const;
+    std::string mapName(std::string name, size_t robotID, size_t deviceID, Stg::Model* mod) const;
 
     tf::TransformBroadcaster tf;
 
@@ -170,60 +171,63 @@ public:
 };
 
 // since stageros is single-threaded, this is OK. revisit if that changes!
-const char *
-StageNode::mapName(const char *name, size_t robotID, Stg::Model* mod) const
+std::string
+StageNode::mapName(std::string name, size_t robotID, Stg::Model* mod) const
 {
     //ROS_INFO("Robot %lu: Device %s", robotID, name);
     bool umn = this->use_model_names;
 
     if ((positionmodels.size() > 1 ) || umn)
     {
-        static char buf[100];
+        std::string buf;
         std::size_t found = std::string(((Stg::Ancestor *) mod)->Token()).find(":");
 
-        if ((found==std::string::npos) && umn)
+        if ((found == std::string::npos) && umn)
         {
-            snprintf(buf, sizeof(buf), "/%s/%s", ((Stg::Ancestor *) mod)->Token(), name);
+            std::string token(((Stg::Ancestor *) mod)->Token());
+            buf = "/" + token + "/" + name;
         }
         else
         {
-            snprintf(buf, sizeof(buf), "/robot_%u/%s", (unsigned int)robotID, name);
+            std::stringstream rID;
+            rID << robotID;
+            buf = "/robot_" + rID.str() + "s/" + name;
         }
-
         return buf;
     }
     else
         return name;
 }
 
-const char *
-StageNode::mapName(const char *name, size_t robotID, size_t deviceID, Stg::Model* mod) const
+std::string 
+StageNode::mapName(std::string name, size_t robotID, size_t deviceID, Stg::Model* mod) const
 {
     //ROS_INFO("Robot %lu: Device %s:%lu", robotID, name, deviceID);
     bool umn = this->use_model_names;
+    std::string buf;
+    std::stringstream dID;
+    dID << deviceID;
 
     if ((positionmodels.size() > 1 ) || umn)
     {
-        static char buf[100];
         std::size_t found = std::string(((Stg::Ancestor *) mod)->Token()).find(":");
 
-        if ((found==std::string::npos) && umn)
+        if ((found == std::string::npos) && umn)
         {
-            snprintf(buf, sizeof(buf), "/%s/%s_%u", ((Stg::Ancestor *) mod)->Token(), name, (unsigned int)deviceID);
+            std::string token(((Stg::Ancestor *) mod)->Token());
+            buf = "/" + token + "/" + name + "_" + dID.str();
         }
         else
         {
-            snprintf(buf, sizeof(buf), "/robot_%u/%s_%u", (unsigned int)robotID, name, (unsigned int)deviceID);
+            std::stringstream rID;
+            rID << robotID;
+            buf = "/robot_" + rID.str() + "/" + name + "_" + dID.str();
         }
-
-        return buf;
     }
     else
-    {
-        static char buf[100];
-        snprintf(buf, sizeof(buf), "/%s_%u", name, (unsigned int)deviceID);
-        return buf;
-    }
+        buf = "/" + name + "_" + dID.str();
+    
+    return buf;
 }
 
 void
